@@ -49,10 +49,12 @@ class Server:
             swriter.write(resp)
             await swriter.drain()
         except uasyncio.TimeoutError:
-            pass
+            swriter.write('Timeout')
+            await swriter.drain()
         except Exception as e:
             logging.info('Exception e={e}', e=e)
-            raise
+            swriter.write('exc={e}'.format(e=e))
+            await swriter.drain()
         logging.info('Client {cid} disconnect.', cid=cid)
         swriter.close()
         await swriter.wait_closed()
