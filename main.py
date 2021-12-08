@@ -1,21 +1,14 @@
 import uasyncio
 import riego
-import logging
+import log
 import ujson
 import machine
 
 
 def web_page(msg):
     html = """<html>
-<head>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-</head>
-<body>
-    <h2>MicroRiego Web Server</h2>
-    <p>
-        {msg}
-    </p>
-</body>
+<head><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+<body><h2>MicroRiego Web Server</h2><p>{msg}</p></body>
 </html>"""
     return html.format(msg=msg)
 
@@ -27,18 +20,18 @@ class Server:
         self.backlog = backlog
         self.timeout = timeout
     async def run(self):
-        logging.info('Awaiting client connection.')
+        log.info('Awaiting client connection.')
         self.cid = 0
         self.server = await uasyncio.start_server(self.run_client, self.host, self.port, self.backlog)
     async def run_client(self, sreader, swriter):
         self.cid += 1
         cid = self.cid
-        logging.info('Got connection from client cid={cid}', cid=cid)
+        log.info('Got connection from client cid={cid}', cid=cid)
         riego.garbage_collect()
         try:
             request = await uasyncio.wait_for(sreader.readline(), self.timeout)
             request_trailer = await uasyncio.wait_for(sreader.read(-1), self.timeout)
-            logging.info('request={request!r}, cid={cid}', request=request, cid=cid)
+            log.info('request={request!r}, cid={cid}', request=request, cid=cid)
             verb, path = request.split()[0:2]
             try:
                 resp = serve_request(verb, path, request_trailer)
@@ -52,19 +45,19 @@ class Server:
             swriter.write('Timeout')
             await swriter.drain()
         except Exception as e:
-            logging.info('Exception e={e}', e=e)
+            log.info('Exception e={e}', e=e)
             swriter.write('exc={e}'.format(e=e))
             await swriter.drain()
-        logging.info('Client {cid} disconnect.', cid=cid)
+        log.info('Client {cid} disconnect.', cid=cid)
         swriter.close()
         await swriter.wait_closed()
-        logging.info('Client {cid} socket closed.', cid=cid)
+        log.info('Client {cid} socket closed.', cid=cid)
 
     async def close(self):
-        logging.info('Closing server')
+        log.info('Closing server')
         self.server.close()
         await self.server.wait_closed()
-        logging.info('Server closed.')
+        log.info('Server closed.')
 
 
 def response(status, content_type, payload):
@@ -88,13 +81,13 @@ def extract_json(request):
     riego.garbage_collect()
     msg = ujson.loads(request[request.rfind(b'\r\n\r\n')+4:])
     if msg.get('auth_token') != AUTH_TOKEN:
-        raise UnauthenticatedError('Unauthenticated. Send json like {"auth_token":"<secret>", "payload": ...}')
+        raise UnauthenticatedError('Unauthorized. Send {"auth_token":"<secret>", "payload": ...}')
     return msg['payload']
 
 
 POST = b'POST'
 def serve_request(verb, path, request_trailer):
-    logging.info(path)
+    log.info(path)
     content_type = 'application/json'
     status = 200
     if path == b'/task_list':
@@ -104,7 +97,7 @@ def serve_request(verb, path, request_trailer):
     elif path == b'/time':
         if verb == POST:
             payload = extract_json(request_trailer)
-            logging.info('set time to {payload}', payload=payload)
+            log.info('set time to {payload}', payload=payload)
             machine.RTC().datetime(payload)
         payload = ujson.dumps(riego.gmtime())
     else:
