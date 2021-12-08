@@ -21,7 +21,7 @@ def web_page(msg):
 
 
 class Server:
-    def __init__(self, host='0.0.0.0', port=80, backlog=5, timeout=5):
+    def __init__(self, host='0.0.0.0', port=80, backlog=5, timeout=20):
         self.host = host
         self.port = port
         self.backlog = backlog
@@ -33,8 +33,8 @@ class Server:
     async def run_client(self, sreader, swriter):
         self.cid += 1
         cid = self.cid
-        riego.garbage_collect()
         logging.info('Got connection from client cid={cid}', cid=cid)
+        riego.garbage_collect()
         try:
             request = await uasyncio.wait_for(sreader.readline(), self.timeout)
             request_trailer = await uasyncio.wait_for(sreader.read(-1), self.timeout)
@@ -85,8 +85,8 @@ class UnauthenticatedError(Exception):
 
 AUTH_TOKEN='1234'
 def extract_json(request):
-    msg = request[request.rfind(b'\r\n\r\n')+4:].decode('utf8')
-    msg = ujson.loads(msg)
+    riego.garbage_collect()
+    msg = ujson.loads(request[request.rfind(b'\r\n\r\n')+4:])
     if msg.get('auth_token') != AUTH_TOKEN:
         raise UnauthenticatedError('Unauthenticated. Send json like {"auth_token":"<secret>", "payload": ...}')
     return msg['payload']

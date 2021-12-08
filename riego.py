@@ -221,7 +221,7 @@ class TaskList:
 
 def garbage_collect():
     orig_free = gc.mem_free()
-    if orig_free < 10000:
+    if orig_free < 20000:
         logging.info('Freeing memory...')
         gc.collect()
         logging.info('Memory it was {orig_free} and now {now_free}',
@@ -250,4 +250,5 @@ async def loop_tasks(threshold=1):
         delta_ms = utime.ticks_ms() - start_ms
         # then subtract it from the waiting time
         await uasyncio.sleep(max(threshold - delta_ms // 1000, 0))
+
 
