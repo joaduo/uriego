@@ -3,7 +3,7 @@ import utime
 import gc
 import log
 
-DAY_SECONDS = 60*60*24
+DAY_SECONDS = 86400
 
 
 def mktime(year, month, mday, hour=0, minute=0, second=0, weekday=0, yearday=0):
@@ -158,14 +158,16 @@ class TaskList:
             assert 0 <= d <= 6
             return d
         except ValueError:
-            return 'mon tue wed thu fri sat sun'.split().index(d.lower()[:3])
+            return ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'
+                    ].index(d.lower()[:3])
     def month_to_int(self, d):
         try:
             d = int(d)
             assert 0 < d <= 12
             return d
         except ValueError:
-            return 'jan feb mar apr jun jul aug sep oct nov dic'.split().index(d.lower()[:3]) + 1
+            return ['jan', 'feb', 'mar', 'apr', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dic'
+                    ].index(d.lower()[:3]) + 1
     async def visit_tasks(self, now, threshold=1, manual=tuple()):
         log.info('Visiting all tasks at {now}', now=utime.gmtime(now))
         min_start = DAY_SECONDS

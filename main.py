@@ -37,13 +37,10 @@ class Server:
             try:
                 resp = serve_request(verb, path, request_trailer)
             except UnauthenticatedError as e:
-                resp = response(401, 'text/html', web_page('%s %r' % (e,e)))
+                resp = response(401, 'text/html', web_page('{} {!r}'.format(e,e)))
             except Exception as e:
-                resp = response(500, 'text/html', web_page('Exception: %s %r' % (e,e)))
+                resp = response(500, 'text/html', web_page('Exception: {} {!r}'.format(e,e)))
             swriter.write(resp)
-            await swriter.drain()
-        except uasyncio.TimeoutError:
-            swriter.write('Timeout')
             await swriter.drain()
         except Exception as e:
             log.info('Exception e={e}', e=e)
@@ -53,7 +50,6 @@ class Server:
         swriter.close()
         await swriter.wait_closed()
         log.info('Client {cid} socket closed.', cid=cid)
-
     async def close(self):
         log.info('Closing server')
         self.server.close()
@@ -67,10 +63,9 @@ def response(status, content_type, payload):
                   403:'FORBIDDEN',
                   401:'UNAUTHENTICATED',
                   500:'SERVER ERROR'}[status]
-    header = ('HTTP/1.1 %s %s\n' % (status, status_msg) +
-          'Content-Type: %s\n' % content_type +
-          'Connection: close\n\n')
-    return header + payload
+    resp = ('HTTP/1.1 %s %s\nContent-Type: %s\nConnection: close\n\n%s'
+            ) % (status, status_msg, content_type, payload)
+    return resp
 
 
 class UnauthenticatedError(Exception):
