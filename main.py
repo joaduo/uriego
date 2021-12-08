@@ -1,6 +1,4 @@
-# userver.py Demo of simple uasyncio-based echo server
-import usocket as socket
-import uasyncio as asyncio
+import uasyncio
 import riego
 import logging
 import ujson
@@ -31,30 +29,34 @@ class Server:
     async def run(self):
         logging.info('Awaiting client connection.')
         self.cid = 0
-        self.server = await asyncio.start_server(self.run_client, self.host, self.port, self.backlog)
+        self.server = await uasyncio.start_server(self.run_client, self.host, self.port, self.backlog)
     async def run_client(self, sreader, swriter):
         self.cid += 1
         cid = self.cid
+        riego.garbage_collect()
         logging.info('Got connection from client cid={cid}', cid=cid)
         try:
-            request = await asyncio.wait_for(sreader.readline(), self.timeout)
-            request_trailer = await asyncio.wait_for(sreader.read(-1), self.timeout)
+            request = await uasyncio.wait_for(sreader.readline(), self.timeout)
+            request_trailer = await uasyncio.wait_for(sreader.read(-1), self.timeout)
             logging.info('request={request!r}, cid={cid}', request=request, cid=cid)
             verb, path = request.split()[0:2]
             try:
                 resp = serve_request(verb, path, request_trailer)
+            except UnauthenticatedError as e:
+                resp = response(401, 'text/html', web_page('%s %r' % (e,e)))
             except Exception as e:
                 resp = response(500, 'text/html', web_page('Exception: %s %r' % (e,e)))
             swriter.write(resp)
             await swriter.drain()
+        except uasyncio.TimeoutError:
+            pass
         except Exception as e:
             logging.info('Exception e={e}', e=e)
-            #raise
+            raise
         logging.info('Client {cid} disconnect.', cid=cid)
         swriter.close()
         await swriter.wait_closed()
         logging.info('Client {cid} socket closed.', cid=cid)
-        riego.garbage_collect()
 
     async def close(self):
         logging.info('Closing server')
@@ -66,6 +68,8 @@ class Server:
 def response(status, content_type, payload):
     status_msg = {200:'OK',
                   404:'NOT FOUND',
+                  403:'FORBIDDEN',
+                  401:'UNAUTHENTICATED',
                   500:'SERVER ERROR'}[status]
     header = ('HTTP/1.1 %s %s\n' % (status, status_msg) +
           'Content-Type: %s\n' % content_type +
@@ -73,21 +77,30 @@ def response(status, content_type, payload):
     return header + payload
 
 
+class UnauthenticatedError(Exception):
+    pass
+
+
+AUTH_TOKEN='1234'
 def extract_json(request):
-    payload = request[request.rfind(b'\r\n\r\n')+4:].decode('utf8')
-    return ujson.loads(payload)
+    msg = request[request.rfind(b'\r\n\r\n')+4:].decode('utf8')
+    msg = ujson.loads(msg)
+    if msg.get('auth_token') != AUTH_TOKEN:
+        raise UnauthenticatedError('Unauthenticated. Send json like {"auth_token":"<secret>", "payload": ...}')
+    return msg['payload']
 
 
+POST = b'POST'
 def serve_request(verb, path, request_trailer):
     logging.info(path)
     content_type = 'application/json'
     status = 200
     if path == b'/task_list':
-        if verb == b'POST':
+        if verb == POST:
             riego.task_list.load_tasks(extract_json(request_trailer))
         payload = ujson.dumps(riego.task_list.table_json)
     elif path == b'/time':
-        if verb == b'POST':
+        if verb == POST:
             payload = extract_json(request_trailer)
             logging.info('set time to {payload}', payload=payload)
             machine.RTC().datetime(payload)
@@ -102,11 +115,11 @@ def serve_request(verb, path, request_trailer):
 def main():
     server = Server()
     try:
-        asyncio.run(server.run())
-        asyncio.run(riego.loop_tasks())
+        uasyncio.run(server.run())
+        uasyncio.run(riego.loop_tasks())
     finally:
-        asyncio.run(server.close())
-        _ = asyncio.new_event_loop()
+        uasyncio.run(server.close())
+        _ = uasyncio.new_event_loop()
 
 main()
 
