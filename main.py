@@ -3,6 +3,7 @@ import usocket as socket
 import uasyncio as asyncio
 import riego
 import logging
+import ujson
 
 
 def web_page():
@@ -60,9 +61,12 @@ class Server:
                 msg = 'NOT FOUND'
                 content = ''
             elif path == b'/task_list':
+                if verb == b'POST':
+                    payload = request_trailer[request_trailer.rfind(b'\r\n\r\n')+4:].decode('utf8')
+                    riego.task_list.load_tasks(ujson.loads(payload))
                 status = 200
                 msg = 'OK'
-                content = ''
+                content = str(riego.task_list.table_json)
             else:
                 status = 200
                 msg = 'OK'
@@ -70,7 +74,7 @@ class Server:
             header = ('HTTP/1.1 %s %s\n' % (status, msg) +
                       'Content-Type: text/html\n'
                       'Connection: close\n\n')
-            swriter.write(header + content + str(riego.task_list.table_json))
+            swriter.write(header + content)
             await swriter.drain()
         except OSError:
             pass
@@ -90,27 +94,11 @@ def main():
     server = Server()
     try:
         asyncio.run(server.run())
-#         riego.task_list.load_json('''[
-#     { 
-#       "name":"test",
-#       "start":"00:00:00", "end":"00:00:40",
-#       "week_days":["Mon", "Wed", "Fri", "Sun"],
-#       "from_day":"Dic,1", "to_day":"Jan,2",
-#       "gate":1, "pump":1
-#       },
-#     { 
-#       "name":"test2",
-#       "start":"09:4:00", "end":"09:7:00",
-#       "week_days":[0,1,2,3,4,5,6],
-#       "from_day":"Dic,1", "to_day":"Dic,1",
-#       "gate":1, "pump":1
-#       }
-#     ]''')
-        riego.task_list.dummy_table()
         asyncio.run(riego.loop_tasks())
     finally:
         asyncio.run(server.close())
         _ = asyncio.new_event_loop()
 
 main()
+
 

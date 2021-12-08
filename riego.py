@@ -1,4 +1,3 @@
-import ujson as json
 import uasyncio
 import utime
 import gc
@@ -146,9 +145,6 @@ class DummyOutput:
 class TaskList:
     table = []
     table_json = []
-    def load_json(self, json_str):
-        tasks = json.loads(json_str)
-        self.load_tasks(tasks)
     def load_tasks(self, table_json):
         to_hms = lambda hms_str: tuple(int(s) for s in hms_str.split(':'))
         to_int_weekday = lambda dlist: sorted(self.weekday_to_int(d) for d in dlist)
@@ -216,9 +212,9 @@ class TaskList:
                     uasyncio.create_task(t.run(now, t.schedule.duration()))
                 min_start = min(min_start, start_delta)
         return min_start
-    async def stop(self, names):
+    async def stop(self, names, all_=False):
         for t in self.table:
-            if t.name in names:
+            if t.name in names or all_:
                 logging.info('Stopping {name!r}', name=t.name)
                 t.stop()
 
@@ -232,7 +228,7 @@ task_list = TaskList()
 manual_names = []
 async def loop_tasks(threshold=1):
     assert threshold > 0
-    max_wait = DAY_SECONDS
+    max_wait = 60 # 1 min
     garbage_collect()
     while True:
         now = time()
@@ -248,7 +244,6 @@ async def loop_tasks(threshold=1):
         start_ms = utime.ticks_ms()
         garbage_collect()
         delta_ms = utime.ticks_ms() - start_ms
-        gc_secs = delta_ms // 1000
         # then subtract it from the waiting time
-        await uasyncio.sleep(threshold - gc_secs)
+        await uasyncio.sleep(max(threshold - delta_ms // 1000, 0))
 
