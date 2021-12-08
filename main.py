@@ -3,6 +3,7 @@ import riego
 import log
 import ujson
 import machine
+import utime
 
 
 def web_page(msg):
@@ -99,7 +100,7 @@ def serve_request(verb, path, request_trailer):
             payload = extract_json(request_trailer)
             log.info('set time to {payload}', payload=payload)
             machine.RTC().datetime(payload)
-        payload = ujson.dumps(riego.gmtime())
+        payload = ujson.dumps(utime.gmtime())
     else:
         status = 404
         content_type = 'text/html'
