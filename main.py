@@ -4,35 +4,26 @@ import uasyncio as asyncio
 import riego
 import logging
 import ujson
+import machine
 
 
-def web_page():
+def web_page(msg):
     html = """<html>
-
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
-
 <body>
-    <h2>ESP MicroPython Web Server</h2>
-
+    <h2>MicroRiego Web Server</h2>
     <p>
-        <i class="fas fa-lightbulb fa-3x" style="color:#c81919;"></i>
-        <a href=\"?led_2_on\"><button class="button">LED ON</button></a>
+        {msg}
     </p>
-    <p>
-        <i class="far fa-lightbulb fa-3x" style="color:#000000;"></i>
-        <a href=\"?led_2_off\"><button class="button button1">LED OFF</button></a>
-    </p>
-
 </body>
-
 </html>"""
-    return html
+    return html.format(msg=msg)
 
 
 class Server:
-    def __init__(self, host='0.0.0.0', port=80, backlog=5, timeout=20):
+    def __init__(self, host='0.0.0.0', port=80, backlog=5, timeout=5):
         self.host = host
         self.port = port
         self.backlog = backlog
@@ -50,11 +41,15 @@ class Server:
             request_trailer = await asyncio.wait_for(sreader.read(-1), self.timeout)
             logging.info('request={request!r}, cid={cid}', request=request, cid=cid)
             verb, path = request.split()[0:2]
-            header, content = serve_requests(verb, path, request_trailer)
-            swriter.write(header + content)
+            try:
+                resp = serve_request(verb, path, request_trailer)
+            except Exception as e:
+                resp = response(500, 'text/html', web_page('Exception: %s %r' % (e,e)))
+            swriter.write(resp)
             await swriter.drain()
         except Exception as e:
             logging.info('Exception e={e}', e=e)
+            #raise
         logging.info('Client {cid} disconnect.', cid=cid)
         swriter.close()
         await swriter.wait_closed()
@@ -68,23 +63,40 @@ class Server:
         logging.info('Server closed.')
 
 
-def serve_requests(verb, path, request_trailer):
+def response(status, content_type, payload):
+    status_msg = {200:'OK',
+                  404:'NOT FOUND',
+                  500:'SERVER ERROR'}[status]
+    header = ('HTTP/1.1 %s %s\n' % (status, status_msg) +
+          'Content-Type: %s\n' % content_type +
+          'Connection: close\n\n')
+    return header + payload
+
+
+def extract_json(request):
+    payload = request[request.rfind(b'\r\n\r\n')+4:].decode('utf8')
+    return ujson.loads(payload)
+
+
+def serve_request(verb, path, request_trailer):
     logging.info(path)
+    content_type = 'application/json'
+    status = 200
     if path == b'/task_list':
         if verb == b'POST':
-            payload = request_trailer[request_trailer.rfind(b'\r\n\r\n')+4:].decode('utf8')
-            riego.task_list.load_tasks(ujson.loads(payload))
-        status = 200
-        msg = 'OK'
-        content = ujson.dumps(riego.task_list.table_json)
+            riego.task_list.load_tasks(extract_json(request_trailer))
+        payload = ujson.dumps(riego.task_list.table_json)
+    elif path == b'/time':
+        if verb == b'POST':
+            payload = extract_json(request_trailer)
+            logging.info('set time to {payload}', payload=payload)
+            machine.RTC().datetime(payload)
+        payload = ujson.dumps(riego.gmtime())
     else:
         status = 404
-        msg = 'NOT FOUND'
-        content = ''
-    header = ('HTTP/1.1 %s %s\n' % (status, msg) +
-              'Content-Type: text/html\n'
-              'Connection: close\n\n')
-    return header, content
+        content_type = 'text/html'
+        payload = web_page('404 Not found')
+    return response(status, content_type, payload)
 
 
 def main():
@@ -97,6 +109,4 @@ def main():
         _ = asyncio.new_event_loop()
 
 main()
-
-
 

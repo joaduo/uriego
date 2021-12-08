@@ -84,7 +84,7 @@ class WeeklySchedule:
 
 
 class RiegoTask:
-    monitoring_threshold = 5
+    monitoring_threshold = 10
     def __init__(self, name, schedule, pump, gate):
         self.name = name
         self.schedule = schedule
@@ -220,8 +220,12 @@ class TaskList:
 
 
 def garbage_collect():
-    if gc.mem_free() < 102000:
+    orig_free = gc.mem_free()
+    if orig_free < 10000:
+        logging.info('Freeing memory...')
         gc.collect()
+        logging.info('Memory it was {orig_free} and now {now_free}',
+                     orig_free=orig_free, now_free=gc.mem_free())
 
 
 task_list = TaskList()
