@@ -8,8 +8,7 @@ import utime
 
 def web_page(msg):
     html = """<html>
-<head><meta name="viewport" content="width=device-width, initial-scale=1"></head>
-<body><h2>MicroRiego Web Server</h2><p>{msg}</p></body>
+<head></head><body><h2>uRiego</h2><p>{msg}</p></body>
 </html>"""
     return html.format(msg=msg)
 
