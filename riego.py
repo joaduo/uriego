@@ -1,9 +1,10 @@
-import uasyncio
-import utime
 import gc
 import log
+import uasyncio
+import utime
 
 DAY_SECONDS = 86400
+MEM_FREE_THRESHOLD=20000
 
 
 def mktime(year, month, mday, hour=0, minute=0, second=0, weekday=0, yearday=0):
@@ -190,7 +191,7 @@ class TaskList:
 
 def garbage_collect():
     orig_free = gc.mem_free()
-    if orig_free < 20000:
+    if orig_free < MEM_FREE_THRESHOLD:
         log.info('Freeing memory...')
         gc.collect()
         log.info('Memory it was {orig_free} and now {now_free}',

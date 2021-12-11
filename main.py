@@ -6,10 +6,16 @@ import machine
 import utime
 
 
+STATUS_CODES = {
+    200:'OK',
+    404:'NOT FOUND',
+    403:'FORBIDDEN',
+    401:'UNAUTHENTICATED',
+    500:'SERVER ERROR'}
+
+
 def web_page(msg):
-    html = """<html>
-<head></head><body><h2>uRiego</h2><p>{msg}</p></body>
-</html>"""
+    html = "<html><head></head><body><h2>uRiego</h2><p>{msg}</p></body></html>"
     return html.format(msg=msg)
 
 
@@ -57,13 +63,8 @@ class Server:
 
 
 def response(status, content_type, payload):
-    status_msg = {200:'OK',
-                  404:'NOT FOUND',
-                  403:'FORBIDDEN',
-                  401:'UNAUTHENTICATED',
-                  500:'SERVER ERROR'}[status]
-    resp = ('HTTP/1.1 %s %s\nContent-Type: %s\nConnection: close\n\n%s'
-            ) % (status, status_msg, content_type, payload)
+    resp = 'HTTP/1.1 {} {}\nContent-Type: {}\nConnection: close\n\n{}'.format(
+            status, STATUS_CODES[status], content_type, payload)
     return resp
 
 
@@ -82,6 +83,7 @@ def extract_json(request):
 
 POST = b'POST'
 def serve_request(verb, path, request_trailer):
+    global AUTH_TOKEN
     log.info(path)
     content_type = 'application/json'
     status = 200
@@ -95,6 +97,15 @@ def serve_request(verb, path, request_trailer):
             log.info('set time to {payload}', payload=payload)
             machine.RTC().datetime(payload)
         payload = ujson.dumps(utime.gmtime())
+    elif path == b'/auth_token':
+        if verb == POST:
+            payload = extract_json(request_trailer)
+            log.info('setting token to {token}...', token=payload[:3])
+            AUTH_TOKEN=payload
+            payload = ujson.dumps(dict(payload='token rotated'))
+        else:
+            content_type = 'text/html'
+            payload = web_page('Send POST {"auth_token":"<secret>", "payload":"<new secret>"}')
     else:
         status = 404
         content_type = 'text/html'
