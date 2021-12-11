@@ -4,6 +4,7 @@ import log
 import ujson
 import machine
 import utime
+import sys
 
 
 STATUS_CODES = {
@@ -44,11 +45,13 @@ class Server:
             except UnauthenticatedError as e:
                 resp = response(401, 'text/html', web_page('{} {!r}'.format(e,e)))
             except Exception as e:
+                sys.print_exception(e)
                 resp = response(500, 'text/html', web_page('Exception: {} {!r}'.format(e,e)))
             swriter.write(resp)
             await swriter.drain()
         except Exception as e:
             log.info('Exception e={e}', e=e)
+            sys.print_exception(e)
             swriter.write('exc={e}'.format(e=e))
             await swriter.drain()
         log.info('Client {cid} disconnect.', cid=cid)
@@ -96,7 +99,7 @@ def serve_request(verb, path, request_trailer):
             payload = extract_json(request_trailer)
             log.info('set time to {payload}', payload=payload)
             machine.RTC().datetime(payload)
-        payload = ujson.dumps(utime.gmtime())
+        payload = ujson.dumps([utime.gmtime(), utime.localtime()])
     elif path == b'/auth_token':
         if verb == POST:
             payload = extract_json(request_trailer)

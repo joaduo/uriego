@@ -207,6 +207,10 @@ async def loop_tasks(threshold=1):
     while True:
         now = utime.time()
         (year, month, mday, hour, minute, second, weekday, yearday) = utime.gmtime(now)
+        if year < 2020:
+            log.info('RTC is wrong {now}', now=now)
+            await uasyncio.sleep(max_wait)
+            continue
         next_delta = await task_list.visit_tasks(now, threshold, manual=tuple(manual_names))
         manual_names.clear()
         tomorrow_delta = mktime(year, month, mday) + DAY_SECONDS - now
