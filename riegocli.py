@@ -129,7 +129,7 @@ def main():
 #     pprint(build_task_list())
 #     test_task_list()
 #     test_auth_token()
-#     verify_time()
+    verify_time()
     send_task_list(build_task_list())
     trigger_tasks('arriba', 'abajo')
 
