@@ -2,13 +2,55 @@ import gc
 import log
 import uasyncio
 import utime
+from machine import Pin
 
 DAY_SECONDS = 86400
 MEM_FREE_THRESHOLD=20000
+PUMP_PIN_NUMBER=12
+GATE_PIN_NUMBER=14
+TASK_LOOP_WAIT_SEC=60
 
 
 def mktime(year, month, mday, hour=0, minute=0, second=0, weekday=0, yearday=0):
     return utime.mktime((year, month, mday, hour, minute, second, weekday, yearday))
+
+
+class Critical(Exception):
+    ...
+
+
+class Pump:
+    def __init__(self, pump_pin_n=PUMP_PIN_NUMBER, valve_pin_n=GATE_PIN_NUMBER):
+        self.pump_out = Pin(pump_pin_n, Pin.OUT)
+        self.valve_out = Pin(valve_pin_n, Pin.OUT)
+        self.preventive_stop()
+    def value(self):
+        return self.pump_out.value()
+    def start(self, valve_value):
+        if self.pump_out.value():
+            self.preventive_stop()
+            raise Critical('Pump already running')
+        log.info('Start pump')
+        self.valve_out.value(valve_value)
+        self.pump_out.on()
+    def preventive_stop(self):
+        if self.pump_out.value():
+            log.info('Preventive stop pump')
+            self.pump_out.off()
+    def stop(self):
+        log.info('Stop pump')
+        self.pump_out.off()
+        # pump off means gates off (no power)
+        self.valve_out.off() # we only save relay power
+    def monitor(self, running):
+        log.info('Monitoring running={running}', running=running)
+        if running:
+            if not self.pump_out.value():
+                raise Critical('Not running?')
+        else:
+            if self.pump_out.value():
+                self.preventive_stop()
+                raise Critical('Still running?')
 
 
 class Day:
@@ -71,12 +113,12 @@ class WeeklySchedule:
 
 
 class RiegoTask:
-    monitoring_threshold = 10
-    def __init__(self, name, schedule, pump, gate):
+    monitoring_period = 10
+    def __init__(self, name, schedule, pump, gate_num):
         self.name = name
         self.schedule = schedule
-        self.gate = gate
         self.pump = pump
+        self.gate_num = gate_num
         self.running = False
     def start_end_deltas(self, t, threshold=1):
         return self.schedule.start_end_deltas(t, threshold)
@@ -88,45 +130,31 @@ class RiegoTask:
         log.info('Running {name!r} at {t}', name=self.name, t=t)
         self.start()
         try:
-            sleep_sec = self.monitoring_threshold
+            sleep_sec = self.monitoring_period
             remaining = duration
-            for i in range(duration//sleep_sec):
+            while remaining > 0:
                 if not self.running:
                     # someone shut things down
                     log.info('Premature stop of {name}', name=self.name)
+                    self.stop()
                     break
                 self.monitor_task()
                 log.info('Running {name!r} remaining={remaining}',
                          name=self.name, remaining=remaining)
                 await uasyncio.sleep(sleep_sec)
                 remaining -= sleep_sec
-            await uasyncio.sleep(duration % sleep_sec)
+            if self.running:
+                await uasyncio.sleep(duration % sleep_sec)
         finally:
             self.stop()
             self.monitor_task()
     def start(self):
-        self.gate.open()
-        self.pump.start()
+        self.pump.start(self.gate_num)
     def stop(self):
         self.pump.stop()
-        self.gate.close()
         self.running = False
     def monitor_task(self):
         self.pump.monitor(running=self.running)
-        self.gate.monitor(running=self.running)
-
-
-class DummyOutput:
-    def open(self):
-        log.info('Open')
-    def close(self):
-        log.info('Close')
-    def start(self):
-        log.info('Start')
-    def stop(self):
-        log.info('Stop')
-    def monitor(self, running):
-        log.info('Monitoring running={running}', running=running)
 
 
 class TaskList:
@@ -136,7 +164,7 @@ class TaskList:
         to_hms = lambda hms_str: tuple(int(s) for s in hms_str.split(':'))
         to_int_weekday = lambda dlist: sorted(self.weekday_to_int(d) for d in dlist)
         new_table = []
-        pump = gate = DummyOutput()
+        pump = Pump()
         for tdict in table_json:
             start = TimePoint(*to_hms(tdict['start']))
             end = TimePoint(*to_hms(tdict['end']))
@@ -146,7 +174,7 @@ class TaskList:
             to_m, to_d = tdict['to_day'].split(',')
             to_day = Day(self.month_to_int(to_m), int(to_d))
             schedule = WeeklySchedule(start, end, week_days, from_day, to_day)
-            t = RiegoTask(tdict['name'], schedule, pump, gate)
+            t = RiegoTask(tdict['name'], schedule, pump, gate_num=tdict['gate'])
             new_table.append(t)
         self.table.clear()
         self.table += new_table
@@ -202,12 +230,12 @@ task_list = TaskList()
 manual_names = []
 async def loop_tasks(threshold=1):
     assert threshold > 0
-    max_wait = 60 # 1 min
+    max_wait = TASK_LOOP_WAIT_SEC
     garbage_collect()
     while True:
         now = utime.time()
         (year, month, mday, hour, minute, second, weekday, yearday) = utime.gmtime(now)
-        if year < 2020:
+        if year < 2021:
             log.info('RTC is wrong {now}', now=now)
             await uasyncio.sleep(max_wait)
             continue
@@ -224,5 +252,4 @@ async def loop_tasks(threshold=1):
         delta_ms = utime.ticks_ms() - start_ms
         # then subtract it from the waiting time
         await uasyncio.sleep(max(threshold - delta_ms // 1000, 0))
-
 
