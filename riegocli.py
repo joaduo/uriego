@@ -4,9 +4,9 @@ import time
 
 
 URL_BASE='http://192.168.4.1/'
-AUTH_TOKEN='123456'
+AUTH_TOKEN='1234'
 
-def get_payload():
+def build_task_list():
     pl = [
         { 
           "name":"test",
@@ -15,7 +15,7 @@ def get_payload():
           "week_days":["Mon", "Wed", "Fri", "Sun"],
           "from_day":"Dic,1", "to_day":"Jan,2",
           "gate":1,
-          "pump":1
+          "pump":0 #ignored by now
         },
         ]
     return pl
@@ -28,33 +28,48 @@ def post(endpoint, payload):
     r = requests.post(URL_BASE + endpoint,
                       data=json.dumps(data),
                       headers=headers)
-    print(r.text)
+    return r
+
+def get(endpoint, params=''):
+    return requests.get(URL_BASE + endpoint + params)
+
 
 def test_task_list():
     endpoint = 'task_list'
     r = requests.get(URL_BASE + endpoint)
     print(r.text)
-    post(endpoint, get_payload())
+    post(endpoint, build_task_list())
 
 
-def test_time():
+def send_task_list(task_list):
+    endpoint = 'task_list'
+    r1 = requests.get(URL_BASE + endpoint)
+    r2 = post(endpoint, task_list)
+#     print(r1.text, r2.text)
+    print(r1.json(), r2.json())
+
+
+def verify_time():
     endpoint = 'time'
-    r = requests.get(URL_BASE + endpoint)
-    print(r.json())
+    get_remote_t = lambda: tuple(get(endpoint).json())
+    mktime = lambda t: time.mktime(t + (0,)) #add missing tm_isdst=0
+    localtime = lambda: time.localtime()[:8] # remove tm_isdst=0
+    remote_t = get_remote_t()
+    local_t = localtime()
+    if abs(mktime(local_t) - mktime(remote_t)) > 2:
+        post(endpoint, local_t)
+        new_dev_time = get_remote_t()
+        assert local_t == new_dev_time, f'local={local_t}, device={new_dev_time}'
+    else:
+        print(f'Device time is correct {remote_t}')
 
 
-    senttime = list(time.localtime())[:8]
-    print(senttime)
-    #Convert (time.localtime output)
-    #(year, month, mday, hour, minute, second, weekday, yearday)
-    # to (RTC datetime args)
-    # https://docs.micropython.org/en/latest/library/machine.RTC.html#machine.RTC.datetime
-    #(year, month, day, weekday, hours, minutes, seconds, [subseconds])
-    senttime = tuple(senttime[0:3] + senttime[6:7] + senttime[3:6] + [0])
-    #print(senttime)
-    post(endpoint, senttime)
-    r = requests.get(URL_BASE + endpoint)
-    print(r.json())
+def trigger_task(name):
+    endpoint = 'manual_task'
+    r1 = get(endpoint)
+    r2 = post(endpoint, [name])
+    print(r1.json(), r2.json())
+    return r2
 
 
 def test_auth_token():
@@ -66,8 +81,10 @@ def test_auth_token():
 
 def main():
 #     test_task_list()
-#     test_time()
-    test_auth_token()
+#     test_auth_token()
+    verify_time()
+    send_task_list(build_task_list())
+    trigger_task('test')
 
 
 if __name__ == '__main__':
