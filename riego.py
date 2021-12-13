@@ -1,4 +1,3 @@
-import gc
 import devices
 import log
 import schedule
@@ -7,7 +6,6 @@ import utime
 import machine
 
 
-MEM_FREE_THRESHOLD=20000
 TASK_LOOP_WAIT_SEC=10
 
 
@@ -73,7 +71,7 @@ class TaskList:
         self.table += new_table
         self.table_json.clear()
         self.table_json += table_json
-        garbage_collect()
+        log.garbage_collect()
     async def visit_tasks(self, now, threshold=1):
         log.info('Visiting all tasks at {now}', now=utime.gmtime(now))
         min_start = schedule.DAY_SECONDS
@@ -101,16 +99,6 @@ class TaskList:
                 log.info('Stopping {name!r}', name=t.name)
                 t.stop()
 
-
-def garbage_collect():
-    orig_free = gc.mem_free()
-    if orig_free < MEM_FREE_THRESHOLD:
-        print('Collecting garbage ori_free={}'.format(orig_free))
-        gc.collect()
-        log.info('Memory it was {orig_free} and now {now_free}',
-                     orig_free=orig_free, now_free=gc.mem_free())
-
-
 def init_devices():
     task_list.pump.stop()
 
@@ -120,7 +108,7 @@ manual_names = []
 async def loop_tasks(threshold=1):
     assert threshold > 0
     max_wait = TASK_LOOP_WAIT_SEC
-    garbage_collect()
+    log.garbage_collect()
     while True:
         if manual_names:
             manual = tuple(manual_names)
@@ -140,7 +128,7 @@ async def loop_tasks(threshold=1):
         await uasyncio.sleep(max(0, wait_delta - threshold))
         # We want to time how ms it takes
         start_ms = utime.ticks_ms()
-        garbage_collect()
+        log.garbage_collect()
         delta_ms = utime.ticks_ms() - start_ms
         # then subtract it from the waiting time
         await uasyncio.sleep(max(threshold - delta_ms // 1000, 0))
