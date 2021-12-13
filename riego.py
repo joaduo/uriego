@@ -197,19 +197,24 @@ class TaskList:
         except ValueError:
             return ['jan', 'feb', 'mar', 'apr', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dic'
                     ].index(d.lower()[:3]) + 1
-    async def visit_tasks(self, now, threshold=1, manual=tuple()):
+    async def visit_tasks(self, now, threshold=1):
         log.info('Visiting all tasks at {now}', now=utime.gmtime(now))
         min_start = DAY_SECONDS
         for t in self.table:
-            start_delta, end_delta = t.start_end_deltas(now, threshold)
-            duration = end_delta - start_delta
+            start_delta, _ = t.start_end_deltas(now, threshold)
             if abs(start_delta) <= threshold:
-                uasyncio.create_task(t.run(now, duration))
+                uasyncio.create_task(t.run(now, t.schedule.duration()))
             else:
-                if t.name in manual:
-                    uasyncio.create_task(t.run(now, t.schedule.duration()))
                 min_start = min(min_start, start_delta)
         return min_start
+    async def manual_tasks(self, now, manual):
+        log.info('Running manual={manual}', manual=manual)
+        for t in self.table:
+            if t.name in manual:
+                duration = t.schedule.duration()
+                log.info('Running {name!r} takes {duration}', name=t.name, duration=duration)
+                uasyncio.create_task(t.run(now, duration))
+                await uasyncio.sleep(duration)
     async def stop(self, names, all_=False):
         for t in self.table:
             if t.name in names or all_:
@@ -233,14 +238,17 @@ async def loop_tasks(threshold=1):
     max_wait = TASK_LOOP_WAIT_SEC
     garbage_collect()
     while True:
+        if manual_names:
+            manual = tuple(manual_names)
+            manual_names.clear() # free the task queue
+            await task_list.manual_tasks(manual)
         now = utime.time()
         (year, month, mday, hour, minute, second, weekday, yearday) = utime.gmtime(now)
         if year < 2021:
             log.info('RTC is wrong {now}', now=now)
             await uasyncio.sleep(max_wait)
             continue
-        next_delta = await task_list.visit_tasks(now, threshold, manual=tuple(manual_names))
-        manual_names.clear()
+        next_delta = await task_list.visit_tasks(now, threshold)
         tomorrow_delta = mktime(year, month, mday) + DAY_SECONDS - now
         wait_delta = min(min(next_delta, tomorrow_delta), max_wait)
         log.info('next_delta={next_delta}, tomorrow_delta={tomorrow_delta}, wait_delta={wait_delta}...',

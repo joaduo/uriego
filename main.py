@@ -94,12 +94,24 @@ def serve_request(verb, path, request_trailer):
         if verb == POST:
             riego.task_list.load_tasks(extract_json(request_trailer))
         payload = ujson.dumps(riego.task_list.table_json)
+    elif path == b'/manual_task':
+        if verb == POST:
+            tasks = extract_json(request_trailer)
+            riego.manual_names.clear()
+            riego.manual_names += tasks
+        payload = ujson.dumps(riego.manual_names)
     elif path == b'/time':
         if verb == POST:
-            payload = extract_json(request_trailer)
-            log.info('set time to {payload}', payload=payload)
-            machine.RTC().datetime(payload)
-        payload = ujson.dumps([utime.gmtime(), utime.localtime()])
+            t = extract_json(request_trailer)
+            log.info('set time to {t}', t=t)
+            #Convert `time.localtime()` output
+            #  (0   , 1    , 2   , 3   , 4     , 5     , 6      , 7      )
+            #  (year, month, mday, hour, minute, second, weekday, yearday)
+            # to `machine.RTC.datetime()` args
+            #  (year, month, day, weekday, hours, minutes, seconds, [subseconds])
+            #  https://docs.micropython.org/en/latest/library/machine.RTC.html#machine.RTC.datetime)
+            machine.RTC().datetime((t[0], t[1], t[2], t[6], t[3], t[4], t[5], 0))
+        payload = ujson.dumps(utime.localtime())
     elif path == b'/auth_token':
         if verb == POST:
             payload = extract_json(request_trailer)
@@ -117,6 +129,9 @@ def serve_request(verb, path, request_trailer):
 
 
 def main():
+    gmt, localt = utime.gmtime(), utime.localtime()
+    assert gmt == localt, 'Gmt must be equal to local for code to work'
+    riego.Pump().stop()
     server = Server()
     try:
         uasyncio.run(server.run())
@@ -125,5 +140,7 @@ def main():
         uasyncio.run(server.close())
         _ = uasyncio.new_event_loop()
 
-main()
+
+if __name__ == '__main__':
+    main()
 
