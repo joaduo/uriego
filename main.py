@@ -16,8 +16,7 @@ STATUS_CODES = {
 
 
 def web_page(msg):
-    html = "<html><head></head><body><h2>uRiego</h2><p>{msg}</p></body></html>"
-    return html.format(msg=msg)
+    return "<html><body><p>{msg}</p></body></html>".format(msg=msg)
 
 
 class Server:
@@ -120,7 +119,7 @@ def serve_request(verb, path, request_trailer):
             payload = ujson.dumps(dict(payload='token rotated'))
         else:
             content_type = 'text/html'
-            payload = web_page('Send POST {"auth_token":"<secret>", "payload":"<new secret>"}')
+            payload = web_page('POST {"auth_token":"<secret>", "payload":"<new secret>"}')
     else:
         status = 404
         content_type = 'text/html'

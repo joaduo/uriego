@@ -2,7 +2,8 @@ import gc
 import log
 import uasyncio
 import utime
-from machine import Pin
+import machine
+
 
 DAY_SECONDS = 86400
 MEM_FREE_THRESHOLD=20000
@@ -21,8 +22,8 @@ class Critical(Exception):
 
 class Pump:
     def __init__(self, pump_pin_n=PUMP_PIN_NUMBER, valve_pin_n=GATE_PIN_NUMBER):
-        self.pump_out = Pin(pump_pin_n, Pin.OUT)
-        self.valve_out = Pin(valve_pin_n, Pin.OUT)
+        self.pump_out = machine.Pin(pump_pin_n, machine.Pin.OUT)
+        self.valve_out = machine.Pin(valve_pin_n, machine.Pin.OUT)
         self.preventive_stop()
     def value(self):
         return self.pump_out.value()
