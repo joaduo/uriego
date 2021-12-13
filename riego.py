@@ -1,4 +1,5 @@
 import gc
+import devices
 import log
 import uasyncio
 import utime
@@ -9,49 +10,11 @@ DAY_SECONDS = 86400
 MEM_FREE_THRESHOLD=20000
 PUMP_PIN_NUMBER=12
 GATE_PIN_NUMBER=14
-TASK_LOOP_WAIT_SEC=60
+TASK_LOOP_WAIT_SEC=3
 
 
 def mktime(year, month, mday, hour=0, minute=0, second=0, weekday=0, yearday=0):
     return utime.mktime((year, month, mday, hour, minute, second, weekday, yearday))
-
-
-class Critical(Exception):
-    ...
-
-
-class Pump:
-    def __init__(self, pump_pin_n=PUMP_PIN_NUMBER, valve_pin_n=GATE_PIN_NUMBER):
-        self.pump_out = machine.Pin(pump_pin_n, machine.Pin.OUT)
-        self.valve_out = machine.Pin(valve_pin_n, machine.Pin.OUT)
-        self.preventive_stop()
-    def value(self):
-        return self.pump_out.value()
-    def start(self, valve_value):
-        if self.pump_out.value():
-            self.preventive_stop()
-            raise Critical('Pump already running')
-        log.info('Start pump')
-        self.valve_out.value(valve_value)
-        self.pump_out.on()
-    def preventive_stop(self):
-        if self.pump_out.value():
-            log.info('Preventive stop pump')
-            self.pump_out.off()
-    def stop(self):
-        log.info('Stop pump')
-        self.pump_out.off()
-        # pump off means gates off (no power)
-        self.valve_out.off() # we only save relay power
-    def monitor(self, running):
-        log.info('Monitoring running={running}', running=running)
-        if running:
-            if not self.pump_out.value():
-                raise Critical('Not running?')
-        else:
-            if self.pump_out.value():
-                self.preventive_stop()
-                raise Critical('Still running?')
 
 
 class Day:
@@ -95,17 +58,14 @@ class WeeklySchedule:
         to_day += DAY_SECONDS
         if not (from_day <= t < to_day):
             # Outside the day ranges
-            log.debug('Outside the day ranges')
             return DAY_SECONDS, DAY_SECONDS
         if weekday not in self.week_days:
             # Not in the day of the week
-            log.debug('Not in the day of the week')
             return DAY_SECONDS, DAY_SECONDS
         # Things are happening today
         day_start_t = mktime(year, month, mday, self.start.hour, self.start.minute, self.start.second)
         start_delta = day_start_t - t
         if start_delta < 0 and abs(start_delta) > threshold:
-            log.debug('Negative delta')
             return DAY_SECONDS, DAY_SECONDS
         day_end_t = mktime(year, month, mday, self.end.hour, self.end.minute, self.end.second)
         end_delta = day_end_t - t
@@ -123,30 +83,28 @@ class RiegoTask:
         self.running = False
     def start_end_deltas(self, t, threshold=1):
         return self.schedule.start_end_deltas(t, threshold)
-    async def run(self, t, duration):
+    async def run(self):
         if self.running:
-            log.info('{name!r} already runnning', name=self.name)
             return
         self.running = True
-        log.info('Running {name!r} at {t}', name=self.name, t=t)
+        log.info('Starting {}'.format(self.name))
         self.start()
         try:
-            sleep_sec = self.monitoring_period
-            remaining = duration
-            while remaining > 0:
+            remaining = self.schedule.duration()
+            while remaining > self.monitoring_period:
                 if not self.running:
-                    # someone shut things down
                     log.info('Premature stop of {name}', name=self.name)
                     self.stop()
                     break
                 self.monitor_task()
                 log.info('Running {name!r} remaining={remaining}',
                          name=self.name, remaining=remaining)
-                await uasyncio.sleep(sleep_sec)
-                remaining -= sleep_sec
-            if self.running:
-                await uasyncio.sleep(duration % sleep_sec)
+                await uasyncio.sleep(self.monitoring_period)
+                remaining -= self.monitoring_period
+            if self.running and remaining:
+                await uasyncio.sleep(remaining)
         finally:
+            log.info('Ending {}'.format(self.name))
             self.stop()
             self.monitor_task()
     def start(self):
@@ -161,61 +119,43 @@ class RiegoTask:
 class TaskList:
     table = []
     table_json = []
+    pump = devices.Pump()
     def load_tasks(self, table_json):
-        to_hms = lambda hms_str: tuple(int(s) for s in hms_str.split(':'))
-        to_int_weekday = lambda dlist: sorted(self.weekday_to_int(d) for d in dlist)
         new_table = []
-        pump = Pump()
         for tdict in table_json:
-            start = TimePoint(*to_hms(tdict['start']))
-            end = TimePoint(*to_hms(tdict['end']))
-            week_days = to_int_weekday(tdict['week_days'])
-            from_m, from_d = tdict['from_day'].split(',')
-            from_day = Day(self.month_to_int(from_m), int(from_d))
-            to_m, to_d = tdict['to_day'].split(',')
-            to_day = Day(self.month_to_int(to_m), int(to_d))
-            schedule = WeeklySchedule(start, end, week_days, from_day, to_day)
-            t = RiegoTask(tdict['name'], schedule, pump, gate_num=tdict['gate'])
+            schedule = WeeklySchedule(TimePoint(*tdict['start']),
+                                      TimePoint(*tdict['end']),
+                                      tdict['week_days'],
+                                      Day(*tdict['from_day']),
+                                      Day(*tdict['to_day']))
+            t = RiegoTask(tdict['name'], schedule, self.pump, gate_num=tdict['gate'])
             new_table.append(t)
         self.table.clear()
         self.table += new_table
         self.table_json.clear()
         self.table_json += table_json
         garbage_collect()
-    def weekday_to_int(self, d):
-        try:
-            d = int(d)
-            assert 0 <= d <= 6
-            return d
-        except ValueError:
-            return ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'
-                    ].index(d.lower()[:3])
-    def month_to_int(self, d):
-        try:
-            d = int(d)
-            assert 0 < d <= 12
-            return d
-        except ValueError:
-            return ['jan', 'feb', 'mar', 'apr', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dic'
-                    ].index(d.lower()[:3]) + 1
     async def visit_tasks(self, now, threshold=1):
         log.info('Visiting all tasks at {now}', now=utime.gmtime(now))
         min_start = DAY_SECONDS
         for t in self.table:
             start_delta, _ = t.start_end_deltas(now, threshold)
             if abs(start_delta) <= threshold:
-                uasyncio.create_task(t.run(now, t.schedule.duration()))
+                uasyncio.create_task(t.run())
             else:
                 min_start = min(min_start, start_delta)
         return min_start
-    async def manual_tasks(self, now, manual):
+    async def manual_tasks(self, manual):
         log.info('Running manual={manual}', manual=manual)
-        for t in self.table:
-            if t.name in manual:
-                duration = t.schedule.duration()
-                log.info('Running {name!r} takes {duration}', name=t.name, duration=duration)
-                uasyncio.create_task(t.run(now, duration))
-                await uasyncio.sleep(duration)
+        name_task = {t.name:t for t in self.table if t.name in manual}
+        for n in manual:
+            t = name_task[n]
+            uasyncio.create_task(t.run())
+            # We run tasks serialized
+            await uasyncio.sleep(t.schedule.duration())
+            while t.running:
+                # Wait for it to properly finish
+                await uasyncio.sleep(1)
     async def stop(self, names, all_=False):
         for t in self.table:
             if t.name in names or all_:
@@ -226,10 +166,14 @@ class TaskList:
 def garbage_collect():
     orig_free = gc.mem_free()
     if orig_free < MEM_FREE_THRESHOLD:
-        log.info('Freeing memory...')
+        print('Collecting garbage ori_free={}'.format(orig_free))
         gc.collect()
         log.info('Memory it was {orig_free} and now {now_free}',
                      orig_free=orig_free, now_free=gc.mem_free())
+
+
+def init_devices():
+    task_list.pump.stop()
 
 
 task_list = TaskList()

@@ -11,12 +11,12 @@ STATUS_CODES = {
     200:'OK',
     404:'NOT FOUND',
     403:'FORBIDDEN',
-    401:'UNAUTHENTICATED',
+    401:'UNAUTHORIZED',
     500:'SERVER ERROR'}
 
 
 def web_page(msg):
-    return "<html><body><p>{msg}</p></body></html>".format(msg=msg)
+    return "<html><body><p>{}</p></body></html>".format(msg)
 
 
 class Server:
@@ -104,17 +104,13 @@ def serve_request(verb, path, request_trailer):
             t = extract_json(request_trailer)
             log.info('set time to {t}', t=t)
             #Convert `time.localtime()` output
-            #  (0   , 1    , 2   , 3   , 4     , 5     , 6      , 7      )
-            #  (year, month, mday, hour, minute, second, weekday, yearday)
             # to `machine.RTC.datetime()` args
-            #  (year, month, day, weekday, hours, minutes, seconds, [subseconds])
-            #  https://docs.micropython.org/en/latest/library/machine.RTC.html#machine.RTC.datetime)
             machine.RTC().datetime((t[0], t[1], t[2], t[6], t[3], t[4], t[5], 0))
         payload = ujson.dumps(utime.localtime())
     elif path == b'/auth_token':
         if verb == POST:
             payload = extract_json(request_trailer)
-            log.info('setting token to {token}...', token=payload[:3])
+            log.info('setting new token')
             AUTH_TOKEN=payload
             payload = ujson.dumps(dict(payload='token rotated'))
         else:
@@ -129,9 +125,10 @@ def serve_request(verb, path, request_trailer):
 
 def main():
     gmt, localt = utime.gmtime(), utime.localtime()
-    assert gmt == localt, 'Gmt must be equal to local for code to work'
-    riego.Pump().stop()
+    assert gmt == localt
+    riego.init_devices()
     server = Server()
+    riego.garbage_collect()
     try:
         uasyncio.run(server.run())
         uasyncio.run(riego.loop_tasks())
