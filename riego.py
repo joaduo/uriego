@@ -21,19 +21,19 @@ class RiegoTask:
         return self.schedule.start_end_deltas(t, threshold)
     async def run(self):
         if self.running:
+            log.info('Task already running {}'.format(self.name))
             return
         self.running = True
         log.info('Starting {}'.format(self.name))
-        self.start()
         try:
+            self.start()
             remaining = self.schedule.duration()
-            while remaining > self.monitoring_period:
+            while remaining >= self.monitoring_period:
                 if not self.running:
                     log.info('Premature stop of {name}', name=self.name)
-                    self.stop()
                     break
                 self.monitor_task()
-                log.info('Running {name!r} remaining={remaining}',
+                log.info('Running {name} remaining={remaining}',
                          name=self.name, remaining=remaining)
                 await uasyncio.sleep(self.monitoring_period)
                 remaining -= self.monitoring_period
@@ -44,7 +44,7 @@ class RiegoTask:
             self.stop()
             self.monitor_task()
     def start(self):
-        self.pump.start(self.gate_num)
+        assert self.pump.start(self.gate_num)
     def stop(self):
         self.pump.stop()
         self.running = False
@@ -56,6 +56,8 @@ class TaskList:
     table = []
     table_json = []
     pump = devices.Pump()
+    stop_manual = False
+    manual_running = 0
     def load_tasks(self, table_json):
         new_table = []
         for tdict in table_json:
@@ -82,24 +84,38 @@ class TaskList:
             else:
                 min_start = min(min_start, start_delta)
         return min_start
-    async def manual_tasks(self, manual):
-        log.info('Running manual={manual}', manual=manual)
-        name_task = {t.name:t for t in self.table if t.name in manual}
-        for n in manual:
+    async def run_manual(self, names):
+        log.info('Running manual={names}', names=names)
+        self.manual_running += 1
+        name_task = {t.name:t for t in self.table if t.name in names}
+        for n in names:
+            if self.stop_manual:
+                log.info('Premature stop of manual tasks')
+                break
             if n not in name_task:
                 continue
             t = name_task[n]
             uasyncio.create_task(t.run())
+            await uasyncio.sleep(TASK_LOOP_WAIT_SEC)
             # We run tasks serialized
-            await uasyncio.sleep(t.schedule.duration())
-            while t.running:
+            while t.running and not self.stop_manual:
                 # Wait for it to properly finish
-                await uasyncio.sleep(1)
+                await uasyncio.sleep(TASK_LOOP_WAIT_SEC)
+            if self.stop_manual:
+                t.stop()
+                log.info('Premature stop of manual tasks')
+                break
+        self.manual_running -= 1
+        if not self.manual_running:
+            self.stop_manual = False
     async def stop(self, names=tuple(), all_=False):
+        if self.manual_running:
+            self.stop_manual = True
         for t in self.table:
             if t.name in names or all_:
                 log.info('Stopping {name!r}', name=t.name)
                 t.stop()
+
 
 def init_devices():
     task_list.pump.stop()
@@ -113,9 +129,9 @@ async def loop_tasks(threshold=1):
     log.garbage_collect()
     while True:
         if manual_names:
-            manual = tuple(manual_names)
+            names = tuple(manual_names)
             manual_names.clear() # free the task queue
-            await task_list.manual_tasks(manual)
+            await task_list.run_manual(names)
         now = utime.time()
         (year, month, mday, hour, minute, second, weekday, yearday) = utime.gmtime(now)
         if year < 2021:

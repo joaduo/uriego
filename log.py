@@ -8,6 +8,10 @@ def debug(msg, *args, **kwargs):
     info(msg, *args, **kwargs)
 
 
+def error(msg, *args, **kwargs):
+    info('ERROR:{}'.format(msg), *args, **kwargs)
+
+
 def info(msg, *args, **kwargs):
     if args:
         msg = msg % args
@@ -19,7 +23,6 @@ def info(msg, *args, **kwargs):
 def garbage_collect():
     orig_free = gc.mem_free()
     if orig_free < MEM_FREE_THRESHOLD:
-        print('Collecting garbage ori_free={}'.format(orig_free))
         gc.collect()
-        info('Memory it was {orig_free} and now {now_free}',
-                     orig_free=orig_free, now_free=gc.mem_free())
+        info('GC: was={orig_free}, now={now_free}',
+              orig_free=orig_free, now_free=gc.mem_free())

@@ -14,7 +14,7 @@ light = devices.InvertedPin(LIGHT_PIN, machine.Pin.OUT)
 
 async def blink():
     light.off()
-    uasyncio.sleep(0.5)
+    await uasyncio.sleep(0.2)
     light.on()
 
 
@@ -30,14 +30,16 @@ async def serve_request(verb, path, request_trailer):
     elif path == b'/stop':
         if verb == webserver.POST:
             payload = webserver.extract_json(request_trailer)
-            if payload.get('__stop_all'):
-                riego.task_list.stop(all_=True)
+            # Stop anything to be ran
+            riego.manual_names.clear()
+            if payload.get('stop_all'):
+                await riego.task_list.stop(all_=True)
             else:
-                riego.task_list.stop(names=payload['task_names'])
+                await riego.task_list.stop(names=payload['names'])
             payload = ujson.dumps(dict(payload='stopped'))
         else:
             content_type = 'text/html'
-            payload = webserver.web_page('POST "payload":{"__stop_all":true, "task_names":["test"]}')
+            payload = webserver.web_page('POST "payload":{"stop_all":true/false, "names":["test"]}')
     elif path == b'/manual_task':
         if verb == webserver.POST:
             tasks = webserver.extract_json(request_trailer)

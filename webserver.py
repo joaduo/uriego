@@ -41,7 +41,7 @@ class Server:
             verb, path = request.split()[0:2]
             try:
                 resp = await self.serve_request(verb, path, request_trailer)
-            except UnauthenticatedError as e:
+            except UnauthorizedError as e:
                 resp = response(401, 'text/html', web_page('{} {!r}'.format(e,e)))
             except Exception as e:
                 sys.print_exception(e)
@@ -70,7 +70,7 @@ def response(status, content_type, payload):
     return resp
 
 
-class UnauthenticatedError(Exception):
+class UnauthorizedError(Exception):
     pass
 
 
@@ -78,6 +78,6 @@ def extract_json(request):
     log.garbage_collect()
     msg = ujson.loads(request[request.rfind(b'\r\n\r\n')+4:])
     if msg.get('auth_token') != AUTH_TOKEN:
-        raise UnauthenticatedError('Unauthorized. Send {"auth_token":"<secret>", "payload": ...}')
+        raise UnauthorizedError('Unauthorized. Send {"auth_token":"<secret>", "payload": ...}')
     return msg['payload']
 
