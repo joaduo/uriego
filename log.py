@@ -5,7 +5,7 @@ MEM_FREE_THRESHOLD=20000
 
 
 def debug(msg, *args, **kwargs):
-    info(msg, *args, **kwargs)
+    info('DEBUG:{}'.format(msg), *args, **kwargs)
 
 
 def error(msg, *args, **kwargs):

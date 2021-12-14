@@ -58,6 +58,7 @@ class TaskList:
     pump = devices.Pump()
     stop_manual = False
     manual_running = 0
+    manual_names = []
     def load_tasks(self, table_json):
         new_table = []
         for tdict in table_json:
@@ -84,7 +85,9 @@ class TaskList:
             else:
                 min_start = min(min_start, start_delta)
         return min_start
-    async def run_manual(self, names):
+    async def run_manual(self):
+        names = tuple(self.manual_names)
+        self.manual_names.clear() # free the task queue
         log.info('Running manual={names}', names=names)
         self.manual_running += 1
         name_task = {t.name:t for t in self.table if t.name in names}
@@ -122,16 +125,13 @@ def init_devices():
 
 
 task_list = TaskList()
-manual_names = []
 async def loop_tasks(threshold=1):
     assert threshold > 0
     max_wait = TASK_LOOP_WAIT_SEC
     log.garbage_collect()
     while True:
-        if manual_names:
-            names = tuple(manual_names)
-            manual_names.clear() # free the task queue
-            await task_list.run_manual(names)
+        if task_list.manual_names:
+            await task_list.run_manual()
         now = utime.time()
         (year, month, mday, hour, minute, second, weekday, yearday) = utime.gmtime(now)
         if year < 2021:
