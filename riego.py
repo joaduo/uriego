@@ -86,6 +86,8 @@ class TaskList:
         log.info('Running manual={manual}', manual=manual)
         name_task = {t.name:t for t in self.table if t.name in manual}
         for n in manual:
+            if n not in name_task:
+                continue
             t = name_task[n]
             uasyncio.create_task(t.run())
             # We run tasks serialized
@@ -93,7 +95,7 @@ class TaskList:
             while t.running:
                 # Wait for it to properly finish
                 await uasyncio.sleep(1)
-    async def stop(self, names, all_=False):
+    async def stop(self, names=tuple(), all_=False):
         for t in self.table:
             if t.name in names or all_:
                 log.info('Stopping {name!r}', name=t.name)
