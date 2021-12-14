@@ -5,6 +5,7 @@ import utime
 import sys
 
 
+AUTH_TOKEN='1234'
 STATUS_CODES = {
     200:'OK',
     404:'NOT FOUND',
@@ -73,10 +74,10 @@ class UnauthenticatedError(Exception):
     pass
 
 
-AUTH_TOKEN='1234'
 def extract_json(request):
     log.garbage_collect()
     msg = ujson.loads(request[request.rfind(b'\r\n\r\n')+4:])
     if msg.get('auth_token') != AUTH_TOKEN:
         raise UnauthenticatedError('Unauthorized. Send {"auth_token":"<secret>", "payload": ...}')
     return msg['payload']
+
