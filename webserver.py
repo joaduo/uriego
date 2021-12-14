@@ -40,7 +40,7 @@ class Server:
             log.info('request={request!r}, cid={cid}', request=request, cid=cid)
             verb, path = request.split()[0:2]
             try:
-                resp = self.serve_request(verb, path, request_trailer)
+                resp = await self.serve_request(verb, path, request_trailer)
             except UnauthenticatedError as e:
                 resp = response(401, 'text/html', web_page('{} {!r}'.format(e,e)))
             except Exception as e:

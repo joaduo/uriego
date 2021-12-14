@@ -5,10 +5,22 @@ import utime
 import riego
 import log
 import webserver
+import devices
 
 
-def serve_request(verb, path, request_trailer):
+LIGHT_PIN=2
+light = devices.InvertedPin(LIGHT_PIN, machine.Pin.OUT)
+
+
+async def blink():
+    light.off()
+    uasyncio.sleep(0.5)
+    light.on()
+
+
+async def serve_request(verb, path, request_trailer):
     log.info(path)
+    uasyncio.create_task(blink())
     content_type = 'application/json'
     status = 200
     if path == b'/task_list':
@@ -63,6 +75,7 @@ def main():
     server = webserver.Server(serve_request)
     log.garbage_collect()
     try:
+        light.on()
         uasyncio.run(server.run())
         uasyncio.run(riego.loop_tasks())
     finally:
