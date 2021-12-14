@@ -8,7 +8,6 @@ import webserver
 
 
 def serve_request(verb, path, request_trailer):
-    global AUTH_TOKEN
     log.info(path)
     content_type = 'application/json'
     status = 200
@@ -19,14 +18,14 @@ def serve_request(verb, path, request_trailer):
     elif path == b'/stop':
         if verb == webserver.POST:
             payload = webserver.extract_json(request_trailer)
-            if payload.get('stop_all'):
+            if payload.get('__stop_all'):
                 riego.task_list.stop(all_=True)
             else:
                 riego.task_list.stop(names=payload['task_names'])
             payload = ujson.dumps(dict(payload='stopped'))
         else:
             content_type = 'text/html'
-            payload = webserver.web_page('POST "payload":{"stop_all":false, "task_names":["test"]}')
+            payload = webserver.web_page('POST "payload":{"__stop_all":true, "task_names":["test"]}')
     elif path == b'/manual_task':
         if verb == webserver.POST:
             tasks = webserver.extract_json(request_trailer)
@@ -45,7 +44,7 @@ def serve_request(verb, path, request_trailer):
         if verb == webserver.POST:
             payload = webserver.extract_json(request_trailer)
             log.info('setting new token')
-            AUTH_TOKEN=payload
+            webserver.AUTH_TOKEN=payload
             payload = ujson.dumps(dict(payload='token rotated'))
         else:
             content_type = 'text/html'
