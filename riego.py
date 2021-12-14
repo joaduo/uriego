@@ -17,6 +17,7 @@ class RiegoTask:
         self.pump = pump
         self.gate_num = gate_num
         self.running = False
+        self.remaining = 0
     def start_end_deltas(self, t, threshold=1):
         return self.schedule.start_end_deltas(t, threshold)
     async def run(self):
@@ -27,18 +28,18 @@ class RiegoTask:
         log.info('Starting {}'.format(self.name))
         try:
             self.start()
-            remaining = self.schedule.duration()
-            while remaining >= self.monitoring_period:
+            self.remaining = self.schedule.duration()
+            while self.remaining >= self.monitoring_period:
                 if not self.running:
                     log.info('Premature stop of {name}', name=self.name)
                     break
                 self.monitor_task()
                 log.info('Running {name} remaining={remaining}',
-                         name=self.name, remaining=remaining)
+                         name=self.name, remaining=self.remaining)
                 await uasyncio.sleep(self.monitoring_period)
-                remaining -= self.monitoring_period
-            if self.running and remaining:
-                await uasyncio.sleep(remaining)
+                self.remaining -= self.monitoring_period
+            if self.running and self.remaining:
+                await uasyncio.sleep(self.remaining)
         finally:
             log.info('Ending {}'.format(self.name))
             self.stop()
@@ -48,6 +49,7 @@ class RiegoTask:
     def stop(self):
         self.pump.stop()
         self.running = False
+        self.remaining = 0
     def monitor_task(self):
         self.pump.monitor(running=self.running)
 

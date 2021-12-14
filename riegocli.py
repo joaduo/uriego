@@ -43,7 +43,7 @@ def build_task_list():
         {
           "name":"abajo",
           "start": to_hms("00:00:00"),
-          "end": to_hms("00:00:20"),
+          "end": to_hms("00:00:60"),
           "week_days":to_int_weekdays(
               ["Mon", "Wed", "Fri", "Sun"]),
           "from_day":to_md_tuple("Dic,1"),
@@ -54,7 +54,7 @@ def build_task_list():
         {
           "name":"arriba",
           "start": to_hms("00:00:00"),
-          "end": to_hms("00:00:10"),
+          "end": to_hms("00:00:60"),
           "week_days":to_int_weekdays(
               ["Mon", "Wed", "Fri", "Sun"]),
           "from_day":to_md_tuple("Dic,1"),
@@ -80,14 +80,14 @@ def get(endpoint, params=''):
 
 
 def test_task_list():
-    endpoint = 'task_list'
+    endpoint = 'tasks'
     r = requests.get(URL_BASE + endpoint)
     print(r.text)
     post(endpoint, build_task_list())
 
 
 def send_task_list(task_list):
-    endpoint = 'task_list'
+    endpoint = 'tasks'
     r1 = requests.get(URL_BASE + endpoint)
     r2 = post(endpoint, task_list)
     print(r1.text, r2.text)
@@ -103,14 +103,14 @@ def verify_time():
     local_t = localtime()
     if abs(mktime(local_t) - mktime(remote_t)) > 2:
         post(endpoint, local_t)
-        new_dev_time = get_remote_t()
-        assert abs(mktime(local_t) - mktime(remote_t)) < 2, f'local={local_t}, device={new_dev_time}'
+        remote_t = get_remote_t()
+        assert abs(mktime(local_t) - mktime(remote_t)) < 2, f'local={local_t}, device={remote_t}'
     else:
         print(f'Device time is correct {remote_t}')
 
 
 def trigger_tasks(*names):
-    endpoint = 'manual_task'
+    endpoint = 'manual'
     r1 = get(endpoint)
     r2 = post(endpoint, names)
 #     print(r1.json(), r2.json())
@@ -119,20 +119,41 @@ def trigger_tasks(*names):
 
 
 def test_auth_token():
-    endpoint = 'auth_token'
-    r = requests.get(URL_BASE + endpoint)
+    endpoint = 'auth'
+    r = get(endpoint)
     print(r.text)
 #     post(endpoint, '123456')
 
 
+def stop_tasks(*names):
+    endpoint = 'stop'
+    if not names:
+        payload = {'stop_all':True}
+    else:
+        payload = {'stop_all':False, 'names':names}
+    r = post(endpoint, payload)
+    print(r.text)
+
+
 def main():
+    pass
 #     pprint(build_task_list())
 #     test_task_list()
 #     test_auth_token()
-    verify_time()
+#     verify_time()
     send_task_list(build_task_list())
-    #trigger_tasks('abajo')
+#     trigger_tasks('abajo')
+#     trigger_tasks('arriba', 'abajo')
+#     time.sleep(12)
+#     stop_tasks('arriba')
+# 
+#     trigger_tasks('abajo')
     trigger_tasks('arriba', 'abajo')
+#     time.sleep(12)
+#     stop_tasks('abajo')
+
+
+#     stop_tasks()
 
 
 if __name__ == '__main__':
