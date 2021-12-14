@@ -43,7 +43,7 @@ def build_task_list():
         {
           "name":"abajo",
           "start": to_hms("00:00:00"),
-          "end": to_hms("00:00:5"),
+          "end": to_hms("00:00:20"),
           "week_days":to_int_weekdays(
               ["Mon", "Wed", "Fri", "Sun"]),
           "from_day":to_md_tuple("Dic,1"),
@@ -54,7 +54,7 @@ def build_task_list():
         {
           "name":"arriba",
           "start": to_hms("00:00:00"),
-          "end": to_hms("00:00:3"),
+          "end": to_hms("00:00:10"),
           "week_days":to_int_weekdays(
               ["Mon", "Wed", "Fri", "Sun"]),
           "from_day":to_md_tuple("Dic,1"),
@@ -104,7 +104,7 @@ def verify_time():
     if abs(mktime(local_t) - mktime(remote_t)) > 2:
         post(endpoint, local_t)
         new_dev_time = get_remote_t()
-        assert local_t == new_dev_time, f'local={local_t}, device={new_dev_time}'
+        assert abs(mktime(local_t) - mktime(remote_t)) < 2, f'local={local_t}, device={new_dev_time}'
     else:
         print(f'Device time is correct {remote_t}')
 
@@ -131,6 +131,7 @@ def main():
 #     test_auth_token()
     verify_time()
     send_task_list(build_task_list())
+    #trigger_tasks('abajo')
     trigger_tasks('arriba', 'abajo')
 
 
