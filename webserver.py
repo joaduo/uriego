@@ -6,6 +6,7 @@ import sys
 
 
 AUTH_TOKEN='1234'
+CONN_TIMEOUT=10
 STATUS_CODES = {
     200:'OK',
     404:'NOT FOUND',
@@ -13,55 +14,11 @@ STATUS_CODES = {
     401:'UNAUTHORIZED',
     500:'SERVER ERROR'}
 POST = b'POST'
+GET = b'GET'
+
 
 def web_page(msg):
     return "<html><body><p>{}</p></body></html>".format(msg)
-
-
-class Server:
-    def __init__(self, serve_request, host='0.0.0.0', port=80, backlog=5, timeout=20):
-        self.serve_request = serve_request
-        self.host = host
-        self.port = port
-        self.backlog = backlog
-        self.timeout = timeout
-    async def run(self):
-        log.info('Opening address={host} port={port}.', host=self.host, port=self.port)
-        self.cid = 0 #connections ids
-        self.server = await uasyncio.start_server(self.run_client, self.host, self.port, self.backlog)
-    async def run_client(self, sreader, swriter):
-        self.cid += 1
-        cid = self.cid
-        log.info('Connection cid={cid}', cid=cid)
-        log.garbage_collect()
-        try:
-            request = await uasyncio.wait_for(sreader.readline(), self.timeout)
-            request_trailer = await uasyncio.wait_for(sreader.read(-1), self.timeout)
-            log.info('request={request!r}, cid={cid}', request=request, cid=cid)
-            verb, path = request.split()[0:2]
-            try:
-                resp = await self.serve_request(verb, path, request_trailer)
-            except UnauthorizedError as e:
-                resp = response(401, 'text/html', web_page('{} {!r}'.format(e,e)))
-            except Exception as e:
-                sys.print_exception(e)
-                resp = response(500, 'text/html', web_page('Exception: {} {!r}'.format(e,e)))
-            swriter.write(resp)
-            await swriter.drain()
-        except Exception as e:
-            log.info('Exception e={e}', e=e)
-            sys.print_exception(e)
-            swriter.write('exc={e}'.format(e=e))
-            await swriter.drain()
-        log.info('Connection {cid} disconnect.', cid=cid)
-        swriter.close()
-        await swriter.wait_closed()
-        log.info('Connection {cid} socket closed.', cid=cid)
-    async def close(self):
-        log.info('Closing server')
-        self.server.close()
-        await self.server.wait_closed()
-        log.info('Server closed.')
 
 
 def response(status, content_type, payload):
@@ -80,4 +37,69 @@ def extract_json(request):
     if msg.get('auth_token') != AUTH_TOKEN:
         raise UnauthorizedError('Unauthorized. Send {"auth_token":"<secret>", "payload": ...}')
     return msg['payload']
+
+
+class Server:
+    def __init__(self, serve_request, host='0.0.0.0', port=80, backlog=5, timeout=CONN_TIMEOUT):
+        self.serve_request = serve_request
+        self.host = host
+        self.port = port
+        self.backlog = backlog
+        self.timeout = timeout
+    async def run(self):
+        log.info('Opening address={host} port={port}.', host=self.host, port=self.port)
+        self.conn_id = 0 #connections ids
+        self.server = await uasyncio.start_server(self.accept_conn, self.host, self.port, self.backlog)
+    async def accept_conn(self, sreader, swriter):
+        self.conn_id += 1
+        conn_id = self.conn_id
+        log.info('Accepting conn_id={conn_id}', conn_id=conn_id)
+        log.garbage_collect()
+        try:
+            request = await uasyncio.wait_for(sreader.readline(), self.timeout)
+            request_trailer = await uasyncio.wait_for(sreader.read(-1), self.timeout)
+            log.debug('request={request!r}, conn_id={conn_id}', request=request, conn_id=conn_id)
+            verb, path = request.split()[0:2]
+            try:
+                resp = await self.serve_request(verb, path, request_trailer)
+            except UnauthorizedError as e:
+                resp = response(401, 'text/html', web_page('{} {!r}'.format(e,e)))
+            swriter.write(resp)
+        except Exception as e:
+            msg = 'Exception e={e} e={e!r} conn_id={conn_id}'.format(e=e, conn_id=conn_id)
+            log.debug(msg)
+            sys.print_exception(e)
+            swriter.write(response(500, 'text/html', web_page(msg)))
+        finally:
+            await swriter.drain()
+            log.debug('Disconnect conn_id={conn_id}.', conn_id=conn_id)
+            swriter.close()
+            await swriter.wait_closed()
+            log.debug('Socket closed conn_id={conn_id}.', conn_id=conn_id)
+    async def close(self):
+        log.debug('Closing server.')
+        self.server.close()
+        await self.server.wait_closed()
+        log.info('Server closed.')
+
+
+def main():
+    async def serve_request(verb, path, request_trailer):
+        log.info('Serving {v} {p}', v=verb, p=path)
+        status = 200
+        content_type = 'text/html'
+        payload = web_page('<h2>Trailer</h2><pre>{}</pre>'.format(request_trailer.decode('utf8')))
+        return response(status, content_type, payload)
+    server = Server(serve_request)
+    log.garbage_collect()
+    try:
+        uasyncio.run(server.run())
+        uasyncio.get_event_loop().run_forever()
+    finally:
+        uasyncio.run(server.close())
+        _ = uasyncio.new_event_loop()
+
+
+if __name__ == '__main__':
+    main()
 
