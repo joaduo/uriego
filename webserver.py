@@ -26,13 +26,13 @@ class Server:
         self.backlog = backlog
         self.timeout = timeout
     async def run(self):
-        log.info('Awaiting client connection.')
-        self.cid = 0
+        log.info('Opening address={host} port={port}.', host=self.host, port=self.port)
+        self.cid = 0 #connections ids
         self.server = await uasyncio.start_server(self.run_client, self.host, self.port, self.backlog)
     async def run_client(self, sreader, swriter):
         self.cid += 1
         cid = self.cid
-        log.info('Got connection from client cid={cid}', cid=cid)
+        log.info('Connection cid={cid}', cid=cid)
         log.garbage_collect()
         try:
             request = await uasyncio.wait_for(sreader.readline(), self.timeout)
@@ -53,10 +53,10 @@ class Server:
             sys.print_exception(e)
             swriter.write('exc={e}'.format(e=e))
             await swriter.drain()
-        log.info('Client {cid} disconnect.', cid=cid)
+        log.info('Connection {cid} disconnect.', cid=cid)
         swriter.close()
         await swriter.wait_closed()
-        log.info('Client {cid} socket closed.', cid=cid)
+        log.info('Connection {cid} socket closed.', cid=cid)
     async def close(self):
         log.info('Closing server')
         self.server.close()
