@@ -105,6 +105,7 @@ def verify_time():
         post(endpoint, local_t)
         remote_t = get_remote_t()
         assert abs(mktime(local_t) - mktime(remote_t)) < 2, f'local={local_t}, device={remote_t}'
+        print(f'Device time updated to {remote_t}')
     else:
         print(f'Device time is correct {remote_t}')
 
@@ -141,19 +142,20 @@ def main():
 #     test_task_list()
 #     test_auth_token()
 #     verify_time()
-    send_task_list(build_task_list())
+#     send_task_list(build_task_list())
+#     send_task_list([])
 #     trigger_tasks('abajo')
 #     trigger_tasks('arriba', 'abajo')
 #     time.sleep(12)
 #     stop_tasks('arriba')
 # 
 #     trigger_tasks('abajo')
-    trigger_tasks('arriba', 'abajo')
+#     trigger_tasks('arriba', 'abajo')
 #     time.sleep(12)
 #     stop_tasks('abajo')
 
 
-#     stop_tasks()
+    stop_tasks()
 
 
 if __name__ == '__main__':
