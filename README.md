@@ -12,7 +12,8 @@ import gc; gc.collect() ; print(gc.mem_free())
 # import network
 # ap = network.WLAN(network.AP_IF)
 # print(ap.ifconfig())
-# ap.config(essid='uriego', authmode=network.AUTH_WPA_WPA2_PSK, password='')
+# ap.config(essid='uriego', authmode=network.AUTH_WPA_WPA2_PSK, password='', channel=4)
+# network.phy_mode(network.MODE_11B)
 # ap.active(True)
 
 ## As client (sometimes it's recorded permanently)
