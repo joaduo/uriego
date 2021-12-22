@@ -94,17 +94,17 @@ def send_task_list(task_list):
 #     print(r1.json(), r2.json())
 
 
-def verify_time():
+def verify_time(threshold=10):
     endpoint = 'time'
     get_remote_t = lambda: tuple(get(endpoint).json())
     mktime = lambda t: time.mktime(t + (0,)) #add missing tm_isdst=0
     localtime = lambda: time.localtime()[:8] # remove tm_isdst=0
     remote_t = get_remote_t()
     local_t = localtime()
-    if abs(mktime(local_t) - mktime(remote_t)) > 2:
+    if abs(mktime(local_t) - mktime(remote_t)) > threshold:
         post(endpoint, local_t)
         remote_t = get_remote_t()
-        assert abs(mktime(local_t) - mktime(remote_t)) < 2, f'local={local_t}, device={remote_t}'
+        assert abs(mktime(local_t) - mktime(remote_t)) < threshold, f'local={local_t}, device={remote_t}'
         print(f'Device time updated to {remote_t}')
     else:
         print(f'Device time is correct {remote_t}')
@@ -141,7 +141,7 @@ def main():
 #     pprint(build_task_list())
 #     test_task_list()
 #     test_auth_token()
-#     verify_time()
+    verify_time()
 #     send_task_list(build_task_list())
 #     send_task_list([])
 #     trigger_tasks('abajo')
@@ -155,7 +155,7 @@ def main():
 #     stop_tasks('abajo')
 
 
-    stop_tasks()
+#     stop_tasks()
 
 
 if __name__ == '__main__':
