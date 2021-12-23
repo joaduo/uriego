@@ -43,10 +43,10 @@ def build_task_list():
         {
           "name":"abajo",
           "start": to_hms("00:00:00"),
-          "end": to_hms("00:00:60"),
-          "week_days":to_int_weekdays(
-              ["Mon", "Wed", "Fri", "Sun"]),
-          "from_day":to_md_tuple("Dic,1"),
+          "end": to_hms("00:20:00"),
+          #"week_days":to_int_weekdays(["Mon", "Wed", "Fri", "Sun"]),
+          "week_days":to_int_weekdays([]),
+          "from_day":to_md_tuple("Jan,1"),
           "to_day":to_md_tuple("Jan,2"),
           "gate":0,
           "pump":0, #ignored by now
@@ -54,10 +54,10 @@ def build_task_list():
         {
           "name":"arriba",
           "start": to_hms("00:00:00"),
-          "end": to_hms("00:00:60"),
-          "week_days":to_int_weekdays(
-              ["Mon", "Wed", "Fri", "Sun"]),
-          "from_day":to_md_tuple("Dic,1"),
+          "end": to_hms("00:10:00"),
+          #"week_days":to_int_weekdays(["Mon", "Wed", "Fri", "Sun"]),
+          "week_days":to_int_weekdays([]),
+          "from_day":to_md_tuple("Jan,1"),
           "to_day":to_md_tuple("Jan,2"),
           "gate":1,
           "pump":0, #ignored by now
@@ -141,8 +141,8 @@ def main():
 #     pprint(build_task_list())
 #     test_task_list()
 #     test_auth_token()
-    verify_time()
-#     send_task_list(build_task_list())
+#     verify_time()
+    send_task_list(build_task_list())
 #     send_task_list([])
 #     trigger_tasks('abajo')
 #     trigger_tasks('arriba', 'abajo')
