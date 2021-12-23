@@ -43,7 +43,7 @@ async def serve_request(verb, path, request_trailer):
     elif path == b'/manual':
         if verb == webserver.POST:
             tasks = webserver.extract_json(request_trailer)
-            riego.task_list.manual_names.clear()
+            #riego.task_list.manual_names.clear()
             riego.task_list.manual_names += tasks
         payload = ujson.dumps(riego.task_list.manual_names)
     elif path == b'/running':
@@ -67,9 +67,13 @@ async def serve_request(verb, path, request_trailer):
             content_type = 'text/html'
             payload = webserver.web_page('POST {"auth_token":"<secret>", "payload":"<new secret>"}')
     else:
-        status = 404
         content_type = 'text/html'
-        payload = webserver.web_page('404 Not found')
+        if path == b'/':
+            resp = webserver.response(status, content_type, '')
+            return resp, webserver.serve_file('/static/client.html')
+        else:
+            status = 404
+            payload = webserver.web_page('404 Not found')
     return webserver.response(status, content_type, payload)
 
 
@@ -78,6 +82,9 @@ def main():
     assert gmt == localt
     riego.init_devices()
     server = webserver.Server(serve_request)
+    server.static_path = b'/static/'
+    riego.task_list.load_tasks([{"from_day": [1, 1], "week_days": [], "name": "abajo",  "end": [0, 20, 0], "gate": 0, "start": [0, 0, 0], "to_day": [1, 2], "pump": 0},
+                                {"from_day": [1, 1], "week_days": [], "name": "arriba", "end": [0, 10, 0], "gate": 1, "start": [0, 0, 0], "to_day": [1, 2], "pump": 0}])
     log.garbage_collect()
     try:
         light.on()
