@@ -1,0 +1,82 @@
+<html>
+<meta name="viewport" content="width=device-width, initial-scale=2.0"> 
+
+<style>
+.btn {
+  background-color: #4CAF50; /* Green */
+  border: none;
+  color: white;
+  padding: 15px 32px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 16px;
+}
+
+.btn2 {background-color: #008CBA;} /* Blue */
+
+</style>
+
+<body>
+
+
+<p><button id='arriba'  class='btn'>Arriba 10min</button></p>
+
+<p><button id='abajo' class='btn btn2'>Abajo 20min</button></p>
+
+<p><button id='stop' class='btn btn2'>STOP</button></p>
+
+</body>
+
+<script>
+  async function postAPI(endpoint, payload){
+      let url = 'http://192.168.4.1/' + endpoint;
+      let data = {"auth_token":"1234", "payload":payload}
+      let headers =  {
+          //'Content-type': 'application/json; charset=UTF-8'
+          'Content-type': 'text/plain'
+      };
+      let request = {
+          method:"POST",
+          body:JSON.stringify(data),
+          headers
+      };
+      let page = await fetch(url,request);
+      let json = await page.json();
+      console.log(json);
+      return json
+  }
+
+  async function postManual(zone){
+      postAPI('manual', [zone])
+  }
+  
+  var button1 = document.getElementById("abajo");
+  button1.addEventListener("click",
+    function(e){
+      button1.disabled = "true"
+      postManual('abajo')
+      button1.disabled = "false"
+    },
+    false);
+
+  var button2 = document.getElementById("arriba");
+  button2.addEventListener("click",
+    function(e){
+      button2.disabled = "true"
+      postManual('arriba')
+      button2.disabled = "false"
+    },
+    false);
+
+  var stop = document.getElementById("stop");
+  stop.addEventListener("click",
+    function(e){
+      stop.disabled = "true"
+      postAPI('stop', {stop_all:true})
+      stop.disabled = "false"
+    },
+    false);
+</script>
+</html>
+
