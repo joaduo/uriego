@@ -39,7 +39,14 @@ def extract_json(request):
     return msg['payload']
 
 
+def serve_file(path):
+    with open(path) as fp:
+        for line in fp:
+            yield line
+
+
 class Server:
+    static_path = b'/static/'
     def __init__(self, serve_request, host='0.0.0.0', port=80, backlog=5, timeout=CONN_TIMEOUT):
         self.serve_request = serve_request
         self.host = host
@@ -60,11 +67,20 @@ class Server:
             request_trailer = await uasyncio.wait_for(sreader.read(-1), self.timeout)
             log.debug('request={request!r}, conn_id={conn_id}', request=request, conn_id=conn_id)
             verb, path = request.split()[0:2]
+            resp_generator = None
             try:
-                resp = await self.serve_request(verb, path, request_trailer)
+                if path.startswith(self.static_path) and verb == GET:
+                    resp = self.serve_static(path)
+                else:
+                    resp = await self.serve_request(verb, path, request_trailer)
+                if isinstance(resp, tuple):
+                    resp, resp_generator = resp
             except UnauthorizedError as e:
                 resp = response(401, 'text/html', web_page('{} {!r}'.format(e,e)))
             swriter.write(resp)
+            if resp_generator:
+                for l in resp_generator:
+                    swriter.write(l)
         except Exception as e:
             msg = 'Exception e={e} e={e!r} conn_id={conn_id}'.format(e=e, conn_id=conn_id)
             log.debug(msg)
@@ -81,6 +97,18 @@ class Server:
         self.server.close()
         await self.server.wait_closed()
         log.info('Server closed.')
+    def serve_static(self, path):
+        if self.file_exists(path):
+            resp = response(200, 'text/html', '')
+            return resp, serve_file(path)
+        return response(404, 'text/html', web_page('404 Not Found'))
+    def file_exists(self, path):
+        try:
+            with open(path):
+                pass
+            return True
+        except:
+            return False
 
 
 def main():
