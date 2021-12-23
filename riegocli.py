@@ -49,7 +49,7 @@ def build_task_list():
           "from_day":to_md_tuple("Dic,1"),
           "to_day":to_md_tuple("Jan,2"),
           "gate":0,
-          "pump":0 #ignored by now
+          "pump":0, #ignored by now
         },
         {
           "name":"arriba",
@@ -60,7 +60,7 @@ def build_task_list():
           "from_day":to_md_tuple("Dic,1"),
           "to_day":to_md_tuple("Jan,2"),
           "gate":1,
-          "pump":0 #ignored by now
+          "pump":0, #ignored by now
         },
         ]
     return pl

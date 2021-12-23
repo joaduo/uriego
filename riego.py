@@ -18,6 +18,8 @@ class RiegoTask:
         self.gate_num = gate_num
         self.running = False
         self.remaining = 0
+    def enabled(self):
+        return bool(self.schedule.enabled())
     def start_end_deltas(self, t, threshold=1):
         return self.schedule.start_end_deltas(t, threshold)
     async def run(self):
@@ -69,7 +71,8 @@ class TaskList:
                     schedule.TimePoint(*tdict['end']),
                     tdict['week_days'],
                     schedule.Day(*tdict['from_day']),
-                    schedule.Day(*tdict['to_day']))
+                    schedule.Day(*tdict['to_day']),
+                    )
             t = RiegoTask(tdict['name'], sched, self.pump, gate_num=tdict['gate'])
             new_table.append(t)
         self.table.clear()
@@ -81,6 +84,8 @@ class TaskList:
         log.info('Visiting all tasks at {now}', now=utime.gmtime(now))
         min_start = schedule.DAY_SECONDS
         for t in self.table:
+            if not t.enabled():
+                continue
             start_delta, _ = t.start_end_deltas(now, threshold)
             if abs(start_delta) <= threshold:
                 uasyncio.create_task(t.run())

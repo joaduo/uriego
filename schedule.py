@@ -41,6 +41,8 @@ class WeeklySchedule:
         self.to_day = to_day
     def duration(self):
         return self.end - self.start
+    def enabled(self):
+        return bool(self.week_days)
     def start_end_deltas(self, t, threshold=1):
         (year, month, mday, _, _, _, weekday, _) = utime.gmtime(t)
         from_day = mktime(year, self.from_day.month, self.from_day.day)
