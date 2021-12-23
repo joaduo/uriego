@@ -46,7 +46,7 @@ def serve_file(path):
 
 
 class Server:
-    static_path = b'/static/'
+    static_path = None # b'/static/'
     def __init__(self, serve_request, host='0.0.0.0', port=80, backlog=5, timeout=CONN_TIMEOUT):
         self.serve_request = serve_request
         self.host = host
@@ -69,7 +69,7 @@ class Server:
             verb, path = request.split()[0:2]
             resp_generator = None
             try:
-                if path.startswith(self.static_path) and verb == GET:
+                if self.static_path and path.startswith(self.static_path) and verb == GET:
                     resp = self.serve_static(path)
                 else:
                     resp = await self.serve_request(verb, path, request_trailer)
