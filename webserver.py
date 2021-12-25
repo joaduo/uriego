@@ -39,11 +39,14 @@ def extract_json(request):
     return msg['payload']
 
 
+CHUNK_SIZE = 1024
 def serve_file(path):
     with open(path) as fp:
-        for line in fp:
-            yield line
-
+        chunk = fp.read(CHUNK_SIZE)
+        while chunk:
+            yield chunk
+            log.garbage_collect()
+            chunk = fp.read(CHUNK_SIZE)
 
 class Server:
     static_path = None # b'/static/'
@@ -81,6 +84,7 @@ class Server:
             if resp_generator:
                 for l in resp_generator:
                     swriter.write(l)
+                    await swriter.drain()
         except Exception as e:
             msg = 'Exception e={e} e={e!r} conn_id={conn_id}'.format(e=e, conn_id=conn_id)
             log.debug(msg)
@@ -99,7 +103,10 @@ class Server:
         log.info('Server closed.')
     def serve_static(self, path):
         if self.file_exists(path):
-            resp = response(200, 'text/html', '')
+            content_type = 'text/html'
+            if path.endswith(b'.js'):
+                content_type = 'application/javascript'
+            resp = response(200, content_type, '')
             return resp, serve_file(path)
         return response(404, 'text/html', web_page('404 Not Found'))
     def file_exists(self, path):
@@ -119,6 +126,7 @@ def main():
         payload = web_page('<h2>Trailer</h2><pre>{}</pre>'.format(request_trailer.decode('utf8')))
         return response(status, content_type, payload)
     server = Server(serve_request)
+    server.static_path = b'/static/'
     log.garbage_collect()
     try:
         uasyncio.run(server.run())

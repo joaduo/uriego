@@ -31,7 +31,7 @@ async def serve_request(verb, path, request_trailer):
         if verb == webserver.POST:
             payload = webserver.extract_json(request_trailer)
             # Stop anything to be ran
-            riego.task_list.manual_names.clear()
+            riego.task_list.manual_queue.clear()
             if payload.get('stop_all'):
                 await riego.task_list.stop(all_=True)
             else:
@@ -44,8 +44,8 @@ async def serve_request(verb, path, request_trailer):
         if verb == webserver.POST:
             tasks = webserver.extract_json(request_trailer)
             #riego.task_list.manual_names.clear()
-            riego.task_list.manual_names += tasks
-        payload = ujson.dumps(riego.task_list.manual_names)
+            riego.task_list.manual_queue.update(tasks)
+        payload = ujson.dumps(riego.task_list.manual_queue)
     elif path == b'/running':
         payload = ujson.dumps({t.name:t.remaining
                                for t in riego.task_list.table if t.running})
@@ -83,8 +83,10 @@ def main():
     riego.init_devices()
     server = webserver.Server(serve_request)
     server.static_path = b'/static/'
-    riego.task_list.load_tasks([{"from_day": [1, 1], "week_days": [], "name": "abajo",  "end": [0, 20, 0], "gate": 0, "start": [0, 0, 0], "to_day": [1, 2], "pump": 0},
-                                {"from_day": [1, 1], "week_days": [], "name": "arriba", "end": [0, 10, 0], "gate": 1, "start": [0, 0, 0], "to_day": [1, 2], "pump": 0}])
+    riego.task_list.load_tasks([{"from_day": [1, 1], "week_days": [], "name": "abajo",  "end": [0, 20, 0],
+                                 "gate": 1, "start": [0, 0, 0], "to_day": [1, 2], "pump": 0},
+                                {"from_day": [1, 1], "week_days": [], "name": "arriba", "end": [0, 10, 0],
+                                 "gate": 0, "start": [0, 0, 0], "to_day": [1, 2], "pump": 0}])
     log.garbage_collect()
     try:
         light.on()

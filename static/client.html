@@ -1,5 +1,5 @@
 <html>
-<meta name="viewport" content="width=device-width, initial-scale=2.0"> 
+<meta name='viewport' content='width=device-width, initial-scale=2.0'> 
 
 <style>
 .btn {
@@ -12,30 +12,37 @@
   display: inline-block;
   font-size: 16px;
 }
-
 .btn2 {background-color: #008CBA;} /* Blue */
+.btn_stop {background-color: #d66;} /* Red */
+.btn_status {background-color: #666;} /* Gray */
 
 </style>
 
 <body>
 
-
-<p><button id='arriba'  class='btn'>Arriba 10min</button></p>
-
-<p><button id='abajo' class='btn btn2'>Abajo 20min</button></p>
-
-<p><button id='stop' class='btn btn2'>STOP</button></p>
+    <script src='/static/petite-vue.js' defer init></script>
+    <div v-scope='{ count: 0, arriba_min: 10, abajo_min: 20 , status: {running:{}}}'>
+        <p><button id='arriba'  class='btn' @click='postManual("arriba", arriba_min)'>Arriba</button>
+          <input type='text' id='minArriba' v-model='arriba_min'/> min </p>
+        <p><button id='abajo'  class='btn btn2' @click='postManual("abajo", abajo_min)'>Abajo</button>
+          <input type='text' id='minAbajo' v-model='abajo_min'/> min </p>
+        <p><button id='stop' class='btn btn_stop' @click='postAPI("stop", {stop_all:true})'>STOP</button></p>
+        <p><button id='status' class='btn btn_status' @click='getRunning(status)'>Status</button>
+          {{status}}</p>
+    </div>
 
 </body>
 
 <script>
+
   async function postAPI(endpoint, payload){
-      let url = 'http://192.168.4.1/' + endpoint;
+      let url = '/' + endpoint;
       let data = {"auth_token":"1234", "payload":payload}
       let headers =  {
-          //'Content-type': 'application/json; charset=UTF-8'
           'Content-type': 'text/plain'
       };
+      //console.log(headers)
+      console.log(data)
       let request = {
           method:"POST",
           body:JSON.stringify(data),
@@ -47,36 +54,15 @@
       return json
   }
 
-  async function postManual(zone){
-      postAPI('manual', [zone])
+  async function postManual(zone, duration){
+      //duration is in seconds, convert minutes to seconds
+      postAPI('manual', {[zone]:{duration: parseInt(duration) * 60}})
   }
-  
-  var button1 = document.getElementById("abajo");
-  button1.addEventListener("click",
-    function(e){
-      button1.disabled = "true"
-      postManual('abajo')
-      button1.disabled = "false"
-    },
-    false);
 
-  var button2 = document.getElementById("arriba");
-  button2.addEventListener("click",
-    function(e){
-      button2.disabled = "true"
-      postManual('arriba')
-      button2.disabled = "false"
-    },
-    false);
+  async function getRunning(status){
+      status['running'] = await postAPI('running', '')
+  }
 
-  var stop = document.getElementById("stop");
-  stop.addEventListener("click",
-    function(e){
-      stop.disabled = "true"
-      postAPI('stop', {stop_all:true})
-      stop.disabled = "false"
-    },
-    false);
 </script>
 </html>
 
