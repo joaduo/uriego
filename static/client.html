@@ -21,24 +21,26 @@
 <body>
 
     <script src='/static/petite-vue.js' defer init></script>
-    <div v-scope='{ count: 0, arriba_min: 10, abajo_min: 20 , status: {running:{}, queue:[]}}'>
-        <p><button id='arriba'  class='btn' @click='postManual("arriba", arriba_min)'>Arriba</button>
-          <input type='text' id='minArriba' v-model='arriba_min'/> min </p>
-        <p><button id='abajo'  class='btn btn2' @click='postManual("abajo", abajo_min)'>Abajo</button>
-          <input type='text' id='minAbajo' v-model='abajo_min'/> min </p>
-        <p><button id='stop' class='btn btn_stop' @click='postAPI("stop", {stop_all:true})'>STOP</button></p>
-        <p><button id='status' class='btn btn_status' @click='getRunning(status)'>Status</button></p>
+    <div v-scope='{ self :
+                    {arriba_min: 10, abajo_min: 20 , status: {running:{}, queue:[]}}
+                  }'>
+        <p><button id='arriba'  class='btn' @click='postManual(self, "arriba", self.arriba_min)'>Arriba</button>
+          <input type='text' id='minArriba' v-model='self.arriba_min'/> min </p>
+        <p><button id='abajo'  class='btn btn2' @click='postManual(self, "abajo", self.abajo_min)'>Abajo</button>
+          <input type='text' id='minAbajo' v-model='self.abajo_min'/> min </p>
+        <p><button id='stop' class='btn btn_stop' @click='postStop(self)'>STOP</button></p>
+        <p><button id='status' class='btn btn_status' @click='getStatus(self)'>Status</button></p>
           <p>Running:
             <ul id="runningList">
-              <li v-for="remaining, name in status.running">
-                {{ name }}: {{ remaining/60. }} min
+              <li v-for="remaining, name in self.status.running">
+                {{ name }}: {{ remaining/60 }} min
               </li>
             </ul>
           </p>
           <p>Queue:
             <ul id="queueList">
-              <li v-for="item in status.queue">
-                {{ item }}
+              <li v-for="item in self.status.queue">
+                {{ item[0] }}: {{ item[1]['duration']/60 }} min
               </li>
             </ul>
           </p>
@@ -82,16 +84,22 @@
       return json
   }
 
-  async function postManual(zone, duration){
+  async function postManual(self, zone, duration){
       //duration is in seconds, convert minutes to seconds
       postAPI('manual', [[zone, {duration: parseInt(duration) * 60
                           //, in_parallel:false
                           }]])
+      getStatus(self)
   }
 
-  async function getRunning(status){
-      status['running'] = await getAPI('running')
-      status['queue'] = await getAPI('manual')
+  async function postStop(self){
+      await postAPI('stop', {stop_all:true})
+      getStatus(self)
+  }
+
+  async function getStatus(self){
+      self.status['running'] = await getAPI('running')
+      self.status['queue'] = await getAPI('manual')
   }
 
 </script>
