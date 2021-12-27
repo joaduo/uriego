@@ -62,7 +62,7 @@ class TaskList:
     pump = devices.Pump()
     stop_manual = False
     manual_running = 0
-    manual_queue = {}
+    manual_queue = []
     def load_tasks(self, table_json):
         new_table = []
         for tdict in table_json:
@@ -93,33 +93,18 @@ class TaskList:
                 min_start = min(min_start, start_delta)
         return min_start
     async def run_manual(self):
-        names = self.manual_queue.copy()
-        self.manual_queue.clear() # free the task queue
-        log.info('Running manual={names}', names=names)
-        self.manual_running += 1
-        name_task = {t.name:t for t in self.table if t.name in names}
-        for n,cfg in names.items():
-            if self.stop_manual:
-                log.info('Premature stop of manual tasks')
-                break
-            if n not in name_task:
-                continue
-            t = name_task[n]
-            uasyncio.create_task(t.run(duration=cfg.get('duration')))
-            await uasyncio.sleep(TASK_LOOP_WAIT_SEC)
-            # We run tasks serialized
-            while t.running and not self.stop_manual:
-                # Wait for it to properly finish
-                await uasyncio.sleep(TASK_LOOP_WAIT_SEC)
-            if self.stop_manual:
-                t.stop()
-                log.info('Premature stop of manual tasks')
-                break
-        self.manual_running -= 1
-        if not self.manual_running:
-            self.stop_manual = False
+        name_task = {t.name:t for t in self.table}
+        while self.manual_queue:
+            n,cfg = self.manual_queue.pop()
+            if n in name_task:
+                t = name_task[n]
+                if cfg.get('in_parallel'):
+                    uasyncio.create_task(t.run(duration=cfg.get('duration')))
+                else:
+                    await t.run(duration=cfg.get('duration'))
     async def stop(self, names=tuple(), all_=False):
-        if self.manual_running:
+        if self.manual_queue:
+            self.manual_queue.clear()
             self.stop_manual = True
         for t in self.table:
             if t.name in names or all_:

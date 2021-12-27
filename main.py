@@ -44,7 +44,8 @@ async def serve_request(verb, path, request_trailer):
         if verb == webserver.POST:
             tasks = webserver.extract_json(request_trailer)
             #riego.task_list.manual_names.clear()
-            riego.task_list.manual_queue.update(tasks)
+            while tasks:
+                riego.task_list.manual_queue.insert(0, tasks.pop())
         payload = ujson.dumps(riego.task_list.manual_queue)
     elif path == b'/running':
         payload = ujson.dumps({t.name:t.remaining

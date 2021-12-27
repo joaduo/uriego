@@ -21,19 +21,47 @@
 <body>
 
     <script src='/static/petite-vue.js' defer init></script>
-    <div v-scope='{ count: 0, arriba_min: 10, abajo_min: 20 , status: {running:{}}}'>
+    <div v-scope='{ count: 0, arriba_min: 10, abajo_min: 20 , status: {running:{}, queue:[]}}'>
         <p><button id='arriba'  class='btn' @click='postManual("arriba", arriba_min)'>Arriba</button>
           <input type='text' id='minArriba' v-model='arriba_min'/> min </p>
         <p><button id='abajo'  class='btn btn2' @click='postManual("abajo", abajo_min)'>Abajo</button>
           <input type='text' id='minAbajo' v-model='abajo_min'/> min </p>
         <p><button id='stop' class='btn btn_stop' @click='postAPI("stop", {stop_all:true})'>STOP</button></p>
-        <p><button id='status' class='btn btn_status' @click='getRunning(status)'>Status</button>
-          {{status}}</p>
+        <p><button id='status' class='btn btn_status' @click='getRunning(status)'>Status</button></p>
+          <p>Running:
+            <ul id="runningList">
+              <li v-for="remaining, name in status.running">
+                {{ name }}: {{ remaining/60. }} min
+              </li>
+            </ul>
+          </p>
+          <p>Queue:
+            <ul id="queueList">
+              <li v-for="item in status.queue">
+                {{ item }}
+              </li>
+            </ul>
+          </p>
     </div>
 
 </body>
 
 <script>
+
+  async function getAPI(endpoint){
+      let url = 'http://192.168.4.1/' + endpoint;
+      let headers =  {
+          'Content-type': 'text/plain'
+      };
+      let request = {
+          method:"GET",
+          headers
+      };
+      let page = await fetch(url,request);
+      let json = await page.json();
+      console.log(json);
+      return json
+  }
 
   async function postAPI(endpoint, payload){
       let url = '/' + endpoint;
@@ -56,11 +84,14 @@
 
   async function postManual(zone, duration){
       //duration is in seconds, convert minutes to seconds
-      postAPI('manual', {[zone]:{duration: parseInt(duration) * 60}})
+      postAPI('manual', [[zone, {duration: parseInt(duration) * 60
+                          //, in_parallel:false
+                          }]])
   }
 
   async function getRunning(status){
-      status['running'] = await postAPI('running', '')
+      status['running'] = await getAPI('running')
+      status['queue'] = await getAPI('manual')
   }
 
 </script>

@@ -144,13 +144,10 @@ def main():
 #     verify_time()
     send_task_list(build_task_list())
 #     send_task_list([])
-#     trigger_tasks('abajo')
-#     trigger_tasks('arriba', 'abajo')
+#     trigger_tasks(('abajo', dict(duration=20*60)))
 #     time.sleep(12)
 #     stop_tasks('arriba')
 # 
-#     trigger_tasks('abajo')
-#     trigger_tasks('arriba', 'abajo')
 #     time.sleep(12)
 #     stop_tasks('abajo')
 
