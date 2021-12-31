@@ -62,8 +62,8 @@
     }
 
     createApp({
-      arriba_min: 10,
-      abajo_min: 20,
+      arribaMin: 10,
+      abajoMin: 20,
       status: {running:{}, queue:[]},
       refresh: false,
       async statusRefresh(){
@@ -106,10 +106,10 @@
   </script>
 
   <div v-scope>
-    <p><button id='arriba'  class='btn' @click='postManual("arriba", arriba_min)'>Arriba</button>
-      <input type='text' id='minArriba' v-model='arriba_min'/> min </p>
-    <p><button id='abajo'  class='btn btn2' @click='postManual("abajo", abajo_min)'>Abajo</button>
-      <input type='text' id='minAbajo' v-model='abajo_min'/> min </p>
+    <p><button id='arriba'  class='btn' @click='postManual("arriba", arribaMin)'>Arriba</button>
+      <input type='text' id='minArriba' v-model='arribaMin'/> min </p>
+    <p><button id='abajo'  class='btn btn2' @click='postManual("abajo", abajoMin)'>Abajo</button>
+      <input type='text' id='minAbajo' v-model='abajoMin'/> min </p>
     <p><button id='stop' class='btn btn_stop' @click='postStop()'>STOP</button></p>
     <p><button id='status' class='btn btn_status' @click='statusRefresh()'>Refresh</button> {{refresh}}</p>
       <p>Running:
