@@ -1,5 +1,8 @@
 <html>
-<meta name='viewport' content='width=device-width, initial-scale=2.0'> 
+<meta name='viewport' content='width=device-width, initial-scale=1.0'>
+
+<title>uRiego</title>
+
 
 <style>
 .btn {
@@ -39,7 +42,7 @@
           </p>
           <p>Queue:
             <ul id="queueList">
-              <li v-for="item in self.status.queue">
+              <li v-for="item in self.status.queue.reverse()">
                 {{ item[0] }}: {{ item[1]['duration']/60 }} min
               </li>
             </ul>
@@ -49,9 +52,10 @@
 </body>
 
 <script>
+  var host = ''
 
   async function getAPI(endpoint){
-      let url = 'http://192.168.4.1/' + endpoint;
+      let url = host + '/' + endpoint;
       let headers =  {
           'Content-type': 'text/plain'
       };
@@ -66,7 +70,7 @@
   }
 
   async function postAPI(endpoint, payload){
-      let url = '/' + endpoint;
+      let url = host + '/' + endpoint;
       let data = {"auth_token":"1234", "payload":payload}
       let headers =  {
           'Content-type': 'text/plain'
@@ -86,7 +90,7 @@
 
   async function postManual(self, zone, duration){
       //duration is in seconds, convert minutes to seconds
-      postAPI('manual', [[zone, {duration: parseInt(duration) * 60
+      postAPI('manual', [[zone, {duration: parseFloat(duration) * 60
                           //, in_parallel:false
                           }]])
       getStatus(self)

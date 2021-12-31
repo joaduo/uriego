@@ -15,15 +15,19 @@ STATUS_CODES = {
     500:'SERVER ERROR'}
 POST = b'POST'
 GET = b'GET'
+EXTRA_HEADERS = {'Access-Control-Allow-Origin': '*'}
 
 
 def web_page(msg):
     return "<html><body><p>{}</p></body></html>".format(msg)
 
 
-def response(status, content_type, payload):
-    resp = 'HTTP/1.1 {} {}\nContent-Type: {}\nConnection: close\n\n{}'.format(
-            status, STATUS_CODES[status], content_type, payload)
+def response(status, content_type, payload, extra_headers=EXTRA_HEADERS):
+    extra_headers = '\n'.join('{}: {}'.format(k,v) for k,v in extra_headers.items())
+    if extra_headers:
+        extra_headers = '\n' + extra_headers
+    resp = 'HTTP/1.1 {} {}\nContent-Type: {}{}\nConnection: close\n\n{}'.format(
+            status, STATUS_CODES[status], content_type, extra_headers, payload)
     return resp
 
 
