@@ -30,8 +30,6 @@ async def serve_request(verb, path, request_trailer):
     elif path == b'/stop':
         if verb == webserver.POST:
             payload = webserver.extract_json(request_trailer)
-            # Stop anything to be ran
-            riego.task_list.manual_queue.clear()
             if payload.get('stop_all'):
                 await riego.task_list.stop(all_=True)
             else:
@@ -43,7 +41,6 @@ async def serve_request(verb, path, request_trailer):
     elif path == b'/manual':
         if verb == webserver.POST:
             tasks = webserver.extract_json(request_trailer)
-            #riego.task_list.manual_names.clear()
             while tasks:
                 riego.task_list.manual_queue.insert(0, tasks.pop())
         payload = ujson.dumps(riego.task_list.manual_queue)

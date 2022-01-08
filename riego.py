@@ -60,8 +60,6 @@ class TaskList:
     table = []
     table_json = []
     pump = devices.Pump()
-    stop_manual = False
-    manual_running = 0
     manual_queue = []
     def load_tasks(self, table_json):
         new_table = []
@@ -104,8 +102,13 @@ class TaskList:
                     await t.run(duration=cfg.get('duration'))
     async def stop(self, names=tuple(), all_=False):
         if self.manual_queue:
-            self.manual_queue.clear()
-            self.stop_manual = True
+            if all_:
+                self.manual_queue.clear()
+            else:
+                new_queue = [(n,cfg) for n, cfg in self.manual_queue
+                             if n not in names]
+                self.manual_queue.clear()
+                self.manual_queue.extend(new_queue)
         for t in self.table:
             if t.name in names or all_:
                 log.info('Stopping {name!r}', name=t.name)
