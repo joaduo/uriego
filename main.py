@@ -23,11 +23,11 @@ async def serve_request(verb, path, request_trailer):
     uasyncio.create_task(blink())
     content_type = 'application/json'
     status = 200
-    if path == b'/tasks':
+    if path == '/tasks':
         if verb == webserver.POST:
             riego.task_list.load_tasks(webserver.extract_json(request_trailer))
         payload = ujson.dumps(riego.task_list.table_json)
-    elif path == b'/stop':
+    elif path == '/stop':
         if verb == webserver.POST:
             payload = webserver.extract_json(request_trailer)
             if payload.get('stop_all'):
@@ -38,16 +38,16 @@ async def serve_request(verb, path, request_trailer):
         else:
             content_type = 'text/html'
             payload = webserver.web_page('POST "payload":{"stop_all":true/false, "names":["test"]}')
-    elif path == b'/manual':
+    elif path == '/manual':
         if verb == webserver.POST:
             tasks = webserver.extract_json(request_trailer)
             while tasks:
                 riego.task_list.manual_queue.insert(0, tasks.pop())
         payload = ujson.dumps(riego.task_list.manual_queue)
-    elif path == b'/running':
+    elif path == '/running':
         payload = ujson.dumps({t.name:t.remaining
                                for t in riego.task_list.table if t.running})
-    elif path == b'/time':
+    elif path == '/time':
         if verb == webserver.POST:
             t = webserver.extract_json(request_trailer)
             log.info('set time to {t}', t=t)
@@ -55,7 +55,7 @@ async def serve_request(verb, path, request_trailer):
             # to `machine.RTC.datetime()` args
             machine.RTC().datetime((t[0], t[1], t[2], t[6], t[3], t[4], t[5], 0))
         payload = ujson.dumps(utime.localtime())
-    elif path == b'/auth':
+    elif path == '/auth':
         if verb == webserver.POST:
             payload = webserver.extract_json(request_trailer)
             log.info('setting new token')
@@ -66,9 +66,8 @@ async def serve_request(verb, path, request_trailer):
             payload = webserver.web_page('POST {"auth_token":"<secret>", "payload":"<new secret>"}')
     else:
         content_type = 'text/html'
-        if path == b'/':
-            resp = webserver.response(status, content_type, '')
-            return resp, webserver.serve_file('/static/client.html')
+        if path == '/':
+            payload = webserver.serve_file('client.html')
         else:
             status = 404
             payload = webserver.web_page('404 Not found')
@@ -80,7 +79,7 @@ def main():
     assert gmt == localt
     riego.init_devices()
     server = webserver.Server(serve_request)
-    server.static_path = b'/static/'
+    server.static_path = '/static/'
     riego.task_list.load_tasks([{"from_day": [1, 1], "week_days": [], "name": "abajo",  "end": [0, 20, 0],
                                  "gate": 1, "start": [0, 0, 0], "to_day": [1, 2], "pump": 0},
                                 {"from_day": [1, 1], "week_days": [], "name": "arriba", "end": [0, 10, 0],
