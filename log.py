@@ -60,9 +60,9 @@ def purge_history():
         web_log_history[:10] = []
 
 
-def garbage_collect(threshold=MEM_FREE_THRESHOLD):
+def garbage_collect(threshold=MEM_FREE_THRESHOLD, force=False):
     orig_free = gc.mem_free()
-    if orig_free < threshold:
+    if orig_free < threshold or force:
         gc.collect()
         now_free=gc.mem_free()
         debug('GC: was={orig_free}, now={now_free}',
