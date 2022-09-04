@@ -25,6 +25,25 @@ import gc; gc.collect() ; print(gc.mem_free())
 # station.active(True)
 # print(station.ifconfig())
 
+
+# As client (sometimes it's recorded permanently)
+ssid = ''
+password = ''
+
+def do_connect():
+    wlan = network.WLAN(network.STA_IF)
+    wlan.active(True)
+    if not wlan.isconnected():
+        print('connecting to network...')
+        wlan.connect(ssid, password)
+        while not wlan.isconnected():
+            pass
+    print('network config:', wlan.ifconfig())
+
+
+do_connect()
+# import webrepl; webrepl.start()
+
 # You can do both Ap + Client, but bear in mind if the Client's network is missing
 # then connections to the AP will be interrupted
 
