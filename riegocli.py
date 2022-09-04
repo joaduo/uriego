@@ -4,6 +4,7 @@ import time
 from pprint import pprint
 
 
+URL_BASE='http://192.168.220.100/'
 URL_BASE='http://192.168.4.1/'
 AUTH_TOKEN='1234'
 
@@ -115,7 +116,8 @@ def trigger_tasks(*names):
     r1 = get(endpoint)
     r2 = post(endpoint, names)
 #     print(r1.json(), r2.json())
-    print(r1.text, r2.text)
+    print(r1.text)
+    print(r2.text)
     return r2
 
 
@@ -142,14 +144,14 @@ def main():
 #     test_task_list()
 #     test_auth_token()
 #     verify_time()
-    send_task_list(build_task_list())
+#     send_task_list(build_task_list())
 #     send_task_list([])
-#     trigger_tasks(('abajo', dict(duration=20*60)))
+#     trigger_tasks(('abajo', dict(duration=2*60)))
 #     time.sleep(12)
 #     stop_tasks('arriba')
 # 
 #     time.sleep(12)
-#     stop_tasks('abajo')
+    stop_tasks('abajo')
 
 
 #     stop_tasks()

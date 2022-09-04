@@ -2,95 +2,115 @@ import uasyncio
 import ujson
 import machine
 import utime
+import network
 import riego
 import log
 import webserver
-import devices
-
+import config
 
 LIGHT_PIN=2
-light = devices.InvertedPin(LIGHT_PIN, machine.Pin.OUT)
-
+light = machine.Pin(LIGHT_PIN, machine.Pin.OUT)
 
 async def blink():
     light.off()
     await uasyncio.sleep(0.2)
     light.on()
 
+wifi_tracker = riego.WifiTracker(config.CLIENT_ESSID, config.CLIENT_PASSWORD,
+                                 config.AP_ESSID, config.AP_PASSWORD, config.AP_CHANNEL)
+task_list = riego.TaskList(wifi_tracker)
+app = webserver.Server(static_path='/static/',
+                       auth_token=config.AUTH_TOKEN,
+                       pre_request_hook=lambda: uasyncio.create_task(blink()))
 
-async def serve_request(verb, path, request_trailer):
-    log.info(path)
-    uasyncio.create_task(blink())
-    content_type = 'application/json'
-    status = 200
-    if path == '/tasks':
-        if verb == webserver.POST:
-            riego.task_list.load_tasks(webserver.extract_json(request_trailer))
-        payload = ujson.dumps(riego.task_list.table_json)
-    elif path == '/stop':
-        if verb == webserver.POST:
-            payload = webserver.extract_json(request_trailer)
-            if payload.get('stop_all'):
-                await riego.task_list.stop(all_=True)
-            else:
-                await riego.task_list.stop(names=payload['names'])
-            payload = ujson.dumps(dict(payload='stopped'))
+@app.json()
+def wifimode(verb, cfg):
+    v = wifi_tracker.is_ap
+    if verb == webserver.POST:
+        if cfg['is_ap'] != v:
+            wifi_tracker.schedule_switch = True
+            v = not v
+    return dict(is_ap=v)
+
+@app.json()
+def wificfg(verb, cfg, auth_token=''):
+    if verb == webserver.POST:
+        orig_is_ap = wifi_tracker.is_ap
+        wifi_tracker.json_set(cfg)
+        if wifi_tracker.is_ap != orig_is_ap:
+            wifi_tracker.schedule_switch = True
+    elif auth_token != config.AUTH_TOKEN:
+        raise webserver.UnauthorizedError('Please provide a valid auth_token parameter')
+    return wifi_tracker.json_get(shadow_passwords=True)
+
+@app.json()
+def tasks(verb, payload):
+    if verb == webserver.POST:
+        task_list.load_tasks(payload)
+    return ujson.dumps(task_list.table_json)
+
+@app.json(is_async=True)
+async def stop(verb, payload):
+    if verb == webserver.POST:
+        if payload.get('stop_all'):
+            await task_list.stop(all_=True)
         else:
-            content_type = 'text/html'
-            payload = webserver.web_page('POST "payload":{"stop_all":true/false, "names":["test"]}')
-    elif path == '/manual':
-        if verb == webserver.POST:
-            tasks = webserver.extract_json(request_trailer)
-            while tasks:
-                riego.task_list.manual_queue.insert(0, tasks.pop())
-        payload = ujson.dumps(riego.task_list.manual_queue)
-    elif path == '/running':
-        payload = ujson.dumps({t.name:t.remaining
-                               for t in riego.task_list.table if t.running})
-    elif path == '/time':
-        if verb == webserver.POST:
-            t = webserver.extract_json(request_trailer)
-            log.info('set time to {t}', t=t)
-            #Convert `time.localtime()` output
-            # to `machine.RTC.datetime()` args
-            machine.RTC().datetime((t[0], t[1], t[2], t[6], t[3], t[4], t[5], 0))
-        payload = ujson.dumps(utime.localtime())
-    elif path == '/auth':
-        if verb == webserver.POST:
-            payload = webserver.extract_json(request_trailer)
-            log.info('setting new token')
-            webserver.AUTH_TOKEN=payload
-            payload = ujson.dumps(dict(payload='token rotated'))
-        else:
-            content_type = 'text/html'
-            payload = webserver.web_page('POST {"auth_token":"<secret>", "payload":"<new secret>"}')
+            await task_list.stop(names=payload['names'])
+        return 'stopped'
     else:
-        content_type = 'text/html'
-        if path == '/':
-            payload = webserver.serve_file('client.html')
-        else:
-            status = 404
-            payload = webserver.web_page('404 Not found')
-    return webserver.response(status, content_type, payload)
+        return dict(help='POST "payload":{"stop_all":true/false, "names":["test"]}')
 
+@app.json()
+def manual(verb, tasks):
+    if verb == webserver.POST:
+        while tasks:
+            task_list.manual_queue.insert(0, tasks.pop())
+    return task_list.manual_queue
+
+@app.json()
+def running(v, p):
+    return {t.name:t.remaining
+            for t in task_list.table if t.running}
+
+@app.json()
+def time(verb, t):
+    if verb == webserver.POST:
+        log.info('set time to {t}', t=t)
+        #Convert `time.localtime()` output
+        # to `machine.RTC.datetime()` args
+        machine.RTC().datetime((t[0], t[1], t[2], t[6], t[3], t[4], t[5], 0))
+    return utime.localtime()
+
+@app.json()
+def auth(verb, password):
+    if verb == webserver.POST:
+        log.info('setting new token')
+        app.auth_token=password
+        return dict(payload='token rotated')
+    else:
+        return dict(help='POST {"auth_token":"<secret>", "payload":"<new secret>"}')
+
+@app.html('/')
+def index(verb, _):
+    return webserver.serve_file('/client.html', {'@=AUTH_TOKEN=@':config.AUTH_TOKEN,
+                                                 '@=SERVER_ADDRESS=@':'',
+                                                 })
 
 def main():
     gmt, localt = utime.gmtime(), utime.localtime()
     assert gmt == localt
-    riego.init_devices()
-    server = webserver.Server(serve_request)
-    server.static_path = '/static/'
-    riego.task_list.load_tasks([{"from_day": [1, 1], "week_days": [], "name": "abajo",  "end": [0, 20, 0],
+    task_list.load_tasks([{"from_day": [1, 1], "week_days": [], "name": "abajo",  "end": [0, 20, 0],
                                  "gate": 1, "start": [0, 0, 0], "to_day": [1, 2], "pump": 0},
                                 {"from_day": [1, 1], "week_days": [], "name": "arriba", "end": [0, 10, 0],
                                  "gate": 0, "start": [0, 0, 0], "to_day": [1, 2], "pump": 0}])
+    log.LOG_LEVEL = log.DEBUG
     log.garbage_collect()
+    light.on()
     try:
-        light.on()
-        uasyncio.run(server.run())
-        uasyncio.run(riego.loop_tasks())
+        uasyncio.run(app.run())
+        uasyncio.run(task_list.loop_tasks())
     finally:
-        uasyncio.run(server.close())
+        uasyncio.run(app.close())
         _ = uasyncio.new_event_loop()
 
 

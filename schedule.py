@@ -2,7 +2,7 @@ import uasyncio
 import utime
 
 
-DAY_SECONDS = 86400
+DAY_SECONDS = 60 * 60 * 24
 
 
 def mktime(year, month, mday, hour=0, minute=0, second=0, weekday=0, yearday=0):

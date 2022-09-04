@@ -25,7 +25,8 @@
 
   <script type="module">
     import { createApp } from '/static/petite-vue-module.min.js'
-    var host = ''
+    var host = '@=SERVER_ADDRESS=@'
+    var auth_token = '@=AUTH_TOKEN=@'
 
     async function getAPI(endpoint){
         let url = host + '/' + endpoint;
@@ -44,7 +45,7 @@
 
     async function postAPI(endpoint, payload){
         let url = host + '/' + endpoint;
-        let data = {"auth_token":"1234", "payload":payload}
+        let data = {"auth_token": auth_token, "payload":payload}
         let headers =  {
             'Content-type': 'text/plain'
         };
@@ -62,6 +63,7 @@
     }
 
     createApp({
+      wifiCfg: null,
       arribaMin: 10,
       abajoMin: 20,
       status: {running:{}, queue:[]},
@@ -75,7 +77,7 @@
         this.status['queue'] = await getAPI('manual')
         if(repeat && this.refresh){
           let self = this
-          setTimeout(function (){self.getStatus(repeat)}, 10000)
+          setTimeout(function (){self.getStatus(repeat)}, 5000)
         }
       },
       async postStop(){
@@ -89,6 +91,12 @@
                               }]])
         this.getStatus(false)
       },
+      async setWifiCfg(){
+        this.wifiCfg = await postAPI('wificfg', this.wifiCfg)
+      },
+      async getWifiCfg(){
+        this.wifiCfg = await getAPI('wificfg?auth_token=' + auth_token)
+      },
       toTime(seconds){
         let min = Math.floor(seconds/60)
         let sec = seconds%60
@@ -101,11 +109,14 @@
         if(sec)
           time = time + sec + ' sec'
         return  time
-      }
+      },
+      async mounted(){
+        //await this.getWifiCfg()
+      },
     }).mount()
   </script>
 
-  <div v-scope>
+  <div v-scope @vue:mounted='mounted'>
     <p><button id='arriba'  class='btn' @click='postManual("arriba", arribaMin)'>Arriba</button>
       <input type='text' id='minArriba' v-model='arribaMin'/> min </p>
     <p><button id='abajo'  class='btn btn2' @click='postManual("abajo", abajoMin)'>Abajo</button>
@@ -126,6 +137,20 @@
           </li>
         </ul>
       </p>
+    <hr/>
+    <h2>Wifi Config</h2>
+    <div v-if='wifiCfg'>
+    <p><input type='checkbox' id='is_ap' v-model='wifiCfg.is_ap'/> is AP </p>
+    <p><input type='input' id='client_essid' v-model='wifiCfg.client_essid'/> client_essid </p>
+    <p><input type='input' id='client_password' v-model='wifiCfg.client_password'/> client_password </p>
+    <p><input type='input' id='ap_essid' v-model='wifiCfg.ap_essid'/> ap_essid </p>
+    <p><input type='input' id='ap_password' v-model='wifiCfg.ap_password'/> ap_password </p>
+    <p><input type='int' id='ap_channel' v-model='wifiCfg.ap_channel'/> ap_channel </p>
+    </div>
+    <p><button id='setWifiCfg' class='btn btn_stop' @click='setWifiCfg()'>Set</button>
+    <button id='getWifiCfg' class='btn' @click='getWifiCfg()'>Get</button>
+    </p>
+    <p/>
   </div>
 
 </body>
