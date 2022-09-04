@@ -1,0 +1,11 @@
+{
+ "AUTH_TOKEN": "MySecretToken",
+ "WifiTracker":{
+    "is_ap": true,
+    "ap_essid": "uriego",
+    "ap_password": "CHANGEMEPLEASE",
+    "ap_channel": 4,
+    "ap_network_mode": null,
+    "client_password": "", 
+    "client_essid": ""}
+}
