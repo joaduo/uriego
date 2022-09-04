@@ -20,7 +20,7 @@ config.load()
 wifi_tracker = riego.WifiTracker()
 task_list = riego.TaskList(wifi_tracker)
 app = webserver.Server(static_path='/static/',
-                       auth_token=config.AUTH_TOKEN,
+                       auth_token=config.get('AUTH_TOKEN'),
                        pre_request_hook=lambda: uasyncio.create_task(blink()))
 
 @app.json()
