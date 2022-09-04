@@ -16,8 +16,8 @@ async def blink():
     await uasyncio.sleep(0.2)
     light.on()
 
-wifi_tracker = riego.WifiTracker(config.CLIENT_ESSID, config.CLIENT_PASSWORD,
-                                 config.AP_ESSID, config.AP_PASSWORD, config.AP_CHANNEL)
+config.load()
+wifi_tracker = riego.WifiTracker()
 task_list = riego.TaskList(wifi_tracker)
 app = webserver.Server(static_path='/static/',
                        auth_token=config.AUTH_TOKEN,
@@ -35,13 +35,14 @@ def wifimode(verb, cfg):
 @app.json()
 def wificfg(verb, cfg, auth_token=''):
     if verb == webserver.POST:
-        orig_is_ap = wifi_tracker.is_ap
         wifi_tracker.json_set(cfg)
-        if wifi_tracker.is_ap != orig_is_ap:
+        if cfg['reboot']:
             wifi_tracker.schedule_switch = True
     elif auth_token != config.AUTH_TOKEN:
         raise webserver.UnauthorizedError('Please provide a valid auth_token parameter')
-    return wifi_tracker.json_get(shadow_passwords=True)
+    out_cfg = wifi_tracker.json_get(shadow_passwords=True)
+    out_cfg['reboot'] = False
+    return out_cfg
 
 @app.json()
 def tasks(verb, payload):

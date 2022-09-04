@@ -5,6 +5,7 @@ import ujson
 import network
 import devices
 import log
+import config
 import schedule
 import webserver
 
@@ -151,15 +152,7 @@ class TaskList:
 
 
 class WifiTracker:
-    def __init__(self,
-                 client_essid,
-                 client_password,
-                 ap_essid,
-                 ap_password,
-                 ap_channel=4,
-                 ap_network_mode=network.MODE_11B,
-                 is_ap=True,
-                 ):
+    def __init__(self):
         self.allow_set = {'client_essid',
                         'client_password',
                         'ap_essid',
@@ -168,20 +161,17 @@ class WifiTracker:
                         'ap_network_mode',
                         'is_ap',
                         }
-        self.client_essid = client_essid
-        self.client_password = client_password
-        self.ap_essid = ap_essid
-        self.ap_password = ap_password
-        self.ap_channel = ap_channel
-        self.ap_network_mode = ap_network_mode
-        self.is_ap = is_ap
+        self.client_essid = None
+        self.client_password = None
+        self.ap_essid = None
+        self.ap_password = None
+        self.ap_channel = None
+        self.ap_network_mode = None
+        self.is_ap = None
+        self.json_set(self.load_cfg())
         self.schedule_switch = False
         self.light = machine.Pin(LIGHT_PIN, machine.Pin.OUT)
         self.button = devices.InvertedPin(WIFI_BUTTON_PIN, machine.Pin.IN)
-        self.cfg_path = './wifi.json'
-        for name, value in self.load_cfg().items():
-            if name in self.allow_set:
-                setattr(self, name, value)
         self.setup_wifi(self.is_ap)
     def json_set(self, cfg):
         for name, value in cfg.items():
@@ -196,28 +186,32 @@ class WifiTracker:
             cfg[n] = v
         return cfg
     def load_cfg(self):
-        cfg = {}
-        if webserver.file_exists(self.cfg_path):
-            with open(self.cfg_path) as fp:
-                cfg = ujson.load(fp)
-        return cfg
+        return config.get(WifiTracker={})
     def dump_cfg(self):
-        with open(self.cfg_path, 'w') as fp:
-            ujson.dump(self.json_get(shadow_passwords=False), fp)
+        config.set_(WifiTracker=self.json_get(shadow_passwords=False))
+        config.dump()
     def setup_wifi(self, attempts=10, wait=5):
         self.ap = ap = network.WLAN(network.AP_IF)
         self.wlan = wlan = network.WLAN(network.STA_IF)
         if self.is_ap:
+            if not all((self.ap_essid, self.ap_password, self.ap_channel)):
+                log.error('Missing AP config, doing nothing')
+                return
             wlan.active(False)
+            ap.active(True)
             ap.config(essid=self.ap_essid,
                       password=self.ap_password,
                       channel=self.ap_channel,
                       authmode=network.AUTH_WPA_WPA2_PSK,
                       )
-            network.phy_mode(self.ap_network_mode)
-            ap.active(True)
+            if self.ap_network_mode != None:
+                log.debug('Setting AP network mode to {}', self.ap_network_mode)
+                network.phy_mode(self.ap_network_mode)
             log.important('ap: {}', ap.ifconfig())
         else:
+            if not all((self.client_essid, self.client_password)):
+                log.error('Missing client config, doing nothing')
+                return
             ap.active(False)
             wlan.active(True)
             if not wlan.isconnected():

@@ -146,6 +146,7 @@
     <p><input type='input' id='ap_essid' v-model='wifiCfg.ap_essid'/> ap_essid </p>
     <p><input type='input' id='ap_password' v-model='wifiCfg.ap_password'/> ap_password </p>
     <p><input type='int' id='ap_channel' v-model='wifiCfg.ap_channel'/> ap_channel </p>
+    <p><input type='checkbox' id='reboot' v-model='wifiCfg.reboot'/> Reboot </p>
     </div>
     <p><button id='setWifiCfg' class='btn btn_stop' @click='setWifiCfg()'>Set</button>
     <button id='getWifiCfg' class='btn' @click='getWifiCfg()'>Get</button>
