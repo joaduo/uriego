@@ -7,16 +7,17 @@ import riego
 import log
 import webserver
 import config
+config.load()
 
 LIGHT_PIN=2
 light = machine.Pin(LIGHT_PIN, machine.Pin.OUT)
+
 
 async def blink():
     light.off()
     await uasyncio.sleep(0.2)
     light.on()
 
-config.load()
 wifi_tracker = riego.WifiTracker()
 task_list = riego.TaskList(wifi_tracker)
 app = webserver.Server(static_path='/static/',
@@ -38,7 +39,7 @@ def wificfg(verb, cfg, auth_token=''):
         wifi_tracker.json_set(cfg)
         if cfg['reboot']:
             wifi_tracker.schedule_switch = True
-    elif auth_token != config.AUTH_TOKEN:
+    elif auth_token != config.get('AUTH_TOKEN'):
         raise webserver.UnauthorizedError('Please provide a valid auth_token parameter')
     out_cfg = wifi_tracker.json_get(shadow_passwords=True)
     out_cfg['reboot'] = False
@@ -93,7 +94,7 @@ def auth(verb, password):
 
 @app.html('/')
 def index(verb, _):
-    return webserver.serve_file('/client.html', {'@=AUTH_TOKEN=@':config.AUTH_TOKEN,
+    return webserver.serve_file('/client.html', {'@=AUTH_TOKEN=@':config.get('AUTH_TOKEN'),
                                                  '@=SERVER_ADDRESS=@':'',
                                                  })
 
