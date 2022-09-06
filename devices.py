@@ -2,17 +2,9 @@ import machine
 import utime
 import log
 
-# D1  GPIO5 OK  OK  often used as SCL (I2C)
-# D2  GPIO4 OK  OK  often used as SDA (I2C)
-# D3  GPIO0 pulled up OK  connected to FLASH button, boot fails if pulled LOW
-# D4  GPIO2 pulled up OK  HIGH at boot connected to on-board LED, boot fails if pulled LOW
-#D5  GPIO14  OK  OK  SPI (SCLK)
-#D6  GPIO12  OK  OK  SPI (MISO)
-#D7  GPIO13  OK  OK  SPI (MOSI)
-#D8  GPIO15  pulled to GND OK  SPI (CS)
-PUMP_PIN_NUMBER=14
-VALVE_1_PIN_NUMBER=12
-VALVE_2_PIN_NUMBER=13
+PUMP_PIN_NUMBER=19
+VALVE_1_PIN_NUMBER=18
+VALVE_2_PIN_NUMBER=5
 
 
 class InvertedPin(machine.Pin):
@@ -46,6 +38,9 @@ class Pump:
             log.error('Pump already running')
             return False
         valve = self.valve_map[valve_value]
+        for v in self.valve_map.values():
+            if v != valve:
+                v.off()
         valve.on()
         self.pump_out.on()
         return self.pump_out.value()

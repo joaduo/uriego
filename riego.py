@@ -7,7 +7,6 @@ import devices
 import log
 import config
 import schedule
-import webserver
 
 WIFI_BUTTON_PIN = 0
 LIGHT_PIN = 2
