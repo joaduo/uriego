@@ -46,6 +46,18 @@ def wificfg(verb, cfg, auth_token=''):
     return out_cfg
 
 @app.json()
+def tasklistcfg(verb, cfg, auth_token=''):
+    if verb == webserver.POST:
+        task_list.json_set(cfg)
+        if cfg['dump']:
+            task_list.dump_cfg()
+    elif auth_token != config.get('AUTH_TOKEN'):
+        raise webserver.UnauthorizedError('Please provide a valid auth_token parameter')
+    out_cfg = task_list.json_get()
+    out_cfg['dump'] = False
+    return out_cfg
+
+@app.json()
 def tasks(verb, payload):
     if verb == webserver.POST:
         task_list.load_tasks(payload)

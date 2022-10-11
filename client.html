@@ -50,7 +50,7 @@
             'Content-type': 'text/plain'
         };
         //console.log(headers)
-        console.log(data)
+        //console.log(data)
         let request = {
             method:"POST",
             body:JSON.stringify(data),
@@ -64,6 +64,7 @@
 
     createApp({
       wifiCfg: null,
+      taskListCfg: null,
       arribaMin: 10,
       abajoMin: 20,
       status: {running:{}, queue:[]},
@@ -96,6 +97,12 @@
       },
       async getWifiCfg(){
         this.wifiCfg = await getAPI('wificfg?auth_token=' + auth_token)
+      },
+      async setTaskListCfg(){
+        this.taskListCfg = await postAPI('tasklistcfg', this.taskListCfg)
+      },
+      async getTaskListCfg(){
+        this.taskListCfg = await getAPI('tasklistcfg?auth_token=' + auth_token)
       },
       toTime(seconds){
         let min = Math.floor(seconds/60)
@@ -145,11 +152,21 @@
     <p><input type='input' id='client_password' v-model='wifiCfg.client_password'/> client_password </p>
     <p><input type='input' id='ap_essid' v-model='wifiCfg.ap_essid'/> ap_essid </p>
     <p><input type='input' id='ap_password' v-model='wifiCfg.ap_password'/> ap_password </p>
-    <p><input type='int' id='ap_channel' v-model='wifiCfg.ap_channel'/> ap_channel </p>
+    <p><input type='number' id='ap_channel' v-model='wifiCfg.ap_channel'/> ap_channel </p>
     <p><input type='checkbox' id='reboot' v-model='wifiCfg.reboot'/> Reboot </p>
     </div>
     <p><button id='setWifiCfg' class='btn btn_stop' @click='setWifiCfg()'>Set</button>
     <button id='getWifiCfg' class='btn' @click='getWifiCfg()'>Get</button>
+    </p>
+    <p/>
+    <hr/>
+    <h2>Taks List Config</h2>
+    <div v-if='taskListCfg'>
+    <p><input type='number' id='task_loop_wait' v-model='taskListCfg.task_loop_wait'/> task_loop_wait </p>
+    <p><input type='checkbox' id='dump' v-model='taskListCfg.dump'/> Save </p>
+    </div>
+    <p><button id='setTaskListCfg' class='btn btn_stop' @click='setTaskListCfg()'>Set</button>
+    <button id='getTaskListCfg' class='btn' @click='getTaskListCfg()'>Get</button>
     </p>
     <p/>
   </div>

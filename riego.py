@@ -10,7 +10,6 @@ import schedule
 
 WIFI_BUTTON_PIN = 0
 LIGHT_PIN = 2
-TASK_LOOP_WAIT_SEC=10
 
 class RiegoTask:
     monitoring_period = 10
@@ -67,6 +66,23 @@ class TaskList:
     def __init__(self, wifi_tracker):
         self.wifi_tracker = wifi_tracker
         self.pump.stop()
+        self.task_loop_wait = 10
+        self.allow_set = {'task_loop_wait'}
+        self.load_cfg()
+    def json_set(self, cfg):
+        for name, value in cfg.items():
+            if name in self.allow_set:
+                setattr(self, name, value)
+    def json_get(self):
+        cfg = {}
+        for n in self.allow_set:
+            cfg[n] = getattr(self, n)
+        return cfg
+    def load_cfg(self):
+        self.json_set(config.get(TaskList={}))
+    def dump_cfg(self):
+        config.set_(TaskList=self.json_get())
+        config.dump()
     def load_tasks(self, table_json):
         new_table = []
         for tdict in table_json:
@@ -86,9 +102,10 @@ class TaskList:
         log.garbage_collect()
     async def loop_tasks(self, threshold=1):
         assert threshold > 0
-        max_wait = TASK_LOOP_WAIT_SEC
         log.garbage_collect()
         while True:
+            # Add 1 sec minimum wait
+            max_wait = max(self.task_loop_wait, 1)
             if self.manual_queue:
                 await self.run_manual()
             now = utime.time()
@@ -167,7 +184,7 @@ class WifiTracker:
         self.ap_channel = None
         self.ap_network_mode = None
         self.is_ap = None
-        self.json_set(self.load_cfg())
+        self.load_cfg()
         self.schedule_switch = False
         self.light = machine.Pin(LIGHT_PIN, machine.Pin.OUT)
         self.button = devices.InvertedPin(WIFI_BUTTON_PIN, machine.Pin.IN)
@@ -185,7 +202,7 @@ class WifiTracker:
             cfg[n] = v
         return cfg
     def load_cfg(self):
-        return config.get(WifiTracker={})
+        self.json_set(config.get(WifiTracker={}))
     def dump_cfg(self):
         config.set_(WifiTracker=self.json_get(shadow_passwords=False))
         config.dump()
@@ -222,7 +239,7 @@ class WifiTracker:
                     attempts -= 1
                     utime.sleep(wait)
             utime.sleep(3)
-            log.important('wlan: {}', wlan.ifconfig())
+            log.important('wlan: {} isconnected: {}', wlan.ifconfig(), wlan.isconnected())
     def will_switch_wifi(self):
         if self.schedule_switch or self.button.value():
             log.debug('Waiting http request to close...')
@@ -239,8 +256,8 @@ class WifiTracker:
             self.light.on()
 
 def main():
-    wt = WifiTracker('patio', '12343214', 'riego5', 'asd09ur9hasio9ykmzx')
-    #wt = WifiTracker('usolar', 'LAMPARAalibaba', 'riego5', 'asd09ur9hasio9ykmzx', is_ap=False)
+    wt = WifiTracker('garden', '1234', 'uriego', '1234')
+    wt.setup_wifi()
 
 if __name__ == '__main__':
     main()

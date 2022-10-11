@@ -48,7 +48,7 @@ def build_task_list():
           #"week_days":to_int_weekdays(["Mon", "Wed", "Fri", "Sun"]),
           "week_days":to_int_weekdays([]),
           "from_day":to_md_tuple("Jan,1"),
-          "to_day":to_md_tuple("Jan,2"),
+          "to_day":to_md_tuple("Jan,2"), #Inclusive
           "gate":0,
           "pump":0, #ignored by now
         },
@@ -59,7 +59,7 @@ def build_task_list():
           #"week_days":to_int_weekdays(["Mon", "Wed", "Fri", "Sun"]),
           "week_days":to_int_weekdays([]),
           "from_day":to_md_tuple("Jan,1"),
-          "to_day":to_md_tuple("Jan,2"),
+          "to_day":to_md_tuple("Jan,2"), #Inclusive
           "gate":1,
           "pump":0, #ignored by now
         },
