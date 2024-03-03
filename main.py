@@ -63,7 +63,7 @@ def tasks(verb, payload):
         task_list.load_tasks(payload)
     return ujson.dumps(task_list.table_json)
 
-@app.json(is_async=True)
+@app.async_json()
 async def stop(verb, payload):
     if verb == webserver.POST:
         if payload.get('stop_all'):
@@ -71,8 +71,7 @@ async def stop(verb, payload):
         else:
             await task_list.stop(names=payload['names'])
         return 'stopped'
-    else:
-        return dict(help='POST "payload":{"stop_all":true/false, "names":["test"]}')
+    return dict(help='POST "payload":{"stop_all":true/false, "names":["test"]}')
 
 @app.json()
 def manual(verb, tasks):

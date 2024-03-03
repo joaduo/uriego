@@ -219,6 +219,25 @@ class Server:
                              auto_json_depth=auto_json_depth,
                              **options
                              )
+    class async_json(_endpoint_decorator):
+        def __init__(self, path=None,
+                           response_builder=None,
+                           extra_headers=EXTRA_HEADERS,
+                           stream=False,
+                           is_async=True,
+                           auto_json=True,
+                           auto_json_depth=0,
+                           **options
+                           ):
+            super().__init__(path=path,
+                             response_builder=response_builder,
+                             extra_headers=extra_headers,
+                             stream=stream,
+                             is_async=is_async,
+                             auto_json=auto_json,
+                             auto_json_depth=auto_json_depth,
+                             **options
+                             )
     class html(_endpoint_decorator):
         content_type = 'text/html'
     class plain(_endpoint_decorator):
