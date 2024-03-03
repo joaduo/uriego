@@ -55,7 +55,8 @@ class StopWebServer(Exception):
 
 def extract_json(payload, auth_token):
     log.garbage_collect()
-    msg = ujson.loads(payload[payload.rfind(b'\r\n\r\n')+4:])
+    log.debug('payload={payload}', payload=payload)
+    msg = ujson.loads(payload)
     if msg.get('auth_token') != auth_token:
         raise UnauthorizedError('Unauthorized. Send {"auth_token":"<secret>", "payload": ...}')
     return msg['payload']
@@ -199,6 +200,7 @@ class Server:
             path = self.path or '/' + method.__name__
             self._endpoints[path] = dict(method=method, options=self.options)
             return method
+
     class json(_endpoint_decorator):
         content_type = 'application/json'
         def __init__(self, path=None,
@@ -219,27 +221,10 @@ class Server:
                              auto_json_depth=auto_json_depth,
                              **options
                              )
-    class async_json(_endpoint_decorator):
-        def __init__(self, path=None,
-                           response_builder=None,
-                           extra_headers=EXTRA_HEADERS,
-                           stream=False,
-                           is_async=True,
-                           auto_json=True,
-                           auto_json_depth=0,
-                           **options
-                           ):
-            super().__init__(path=path,
-                             response_builder=response_builder,
-                             extra_headers=extra_headers,
-                             stream=stream,
-                             is_async=is_async,
-                             auto_json=auto_json,
-                             auto_json_depth=auto_json_depth,
-                             **options
-                             )
+
     class html(_endpoint_decorator):
         content_type = 'text/html'
+
     class plain(_endpoint_decorator):
         content_type = 'text/plain'
 
@@ -275,10 +260,12 @@ class Server:
                                          response_builder=response,
                                          status=404,
                                      ))
+
     async def run(self):
         log.debug('Opening address={host} port={port}.', host=self.host, port=self.port)
         self.conn_id = 0 #connections ids
         self.server = await uasyncio.start_server(self.accept_conn, self.host, self.port, self.backlog)
+
     async def accept_conn(self, sreader, swriter):
         self.conn_id += 1
         conn_id = self.conn_id
@@ -286,7 +273,8 @@ class Server:
         log.garbage_collect()
         try:
             verb, path, query_string = await self.read_request_line(sreader, self.timeout)
-            payload = await uasyncio.wait_for(sreader.read(-1), self.timeout)
+            headers = await self.read_headers(sreader)
+            payload = await self.read_payload(sreader, headers)
             log.debug('request={request!r}, conn_id={conn_id}', request=path, conn_id=conn_id)
             try:
                 if self.static_path and path.startswith(self.static_path) and verb == GET:
@@ -312,11 +300,13 @@ class Server:
             await swriter.wait_closed()
             log.debug('Socket closed conn_id={conn_id}.', conn_id=conn_id)
             log.garbage_collect()
+
     async def close(self):
         log.debug('Closing server.')
         self.server.close()
         await self.server.wait_closed()
         log.info('Server closed.')
+
     def serve_static(self, path):
         if file_exists(path):
             content_type = 'text/html'
@@ -324,6 +314,7 @@ class Server:
                 content_type = 'application/javascript'
             return response(200, content_type, serve_file(path, self.static_files_replacements))
         return response(404, 'text/html', web_page('404 Not Found'))
+
     async def read_request_line(self, sreader, timeout=CONN_TIMEOUT):
         while True:
             rl = await uasyncio.wait_for(sreader.readline(), timeout)
@@ -341,6 +332,44 @@ class Server:
         if len(url_frags) > 1:
             query_string = url_frags[1]
         return verb, path, query_string
+
+    async def read_headers(self, sreader):
+        #taken from tinyweb
+        headers = {}
+        while True:
+            #gc.collect()
+            log.garbage_collect()
+            line = await sreader.readline()
+            if line == b'\r\n':
+                break
+            frags = line.split(b':', 1)
+            log.debug('frags={frags}', frags=frags)
+            if len(frags) != 2:
+                pass
+            else:
+                headers[frags[0]] = frags[1].strip()
+        return headers
+
+    async def read_payload(self, sreader, headers):
+        lch = {k.lower():v for k,v in headers.items()}
+        if b'content-length' not in lch:
+            return ''
+        # Parse payload depending on content type
+        if b'content-type' not in lch:
+            # Unknown content type, return unparsed, raw data
+            return ''
+        size = int(lch[b'content-length'])
+        log.debug('content size={size}', size=size)
+        if size < 0:
+            return ''
+        data = await sreader.readexactly(size)
+        ct = lch[b'content-type'].split(b';', 1)[0]
+        return data
+        # if ct == b'application/json':
+        #     return ujson.loads(data)
+        # elif ct == b'application/x-www-form-urlencoded':
+        #     return parse_query_string(data.decode())
+
     async def serve_request(self, verb, path, params, req_payload, swriter):
         if self.pre_request_hook:
             self.pre_request_hook()
@@ -361,6 +390,7 @@ class Server:
                                 options['content_type'],
                                 resp_payload,
                                 extra_headers=options['extra_headers'])
+
     async def send_response(self, swriter, resp):
         if isinstance(resp, (str, bytes)):
             if resp:
@@ -377,11 +407,12 @@ class Server:
                     await swriter.drain()
                     count = 0
             return count
+
     def json_load(self, payload):
         return extract_json(payload, self.auth_token)
+
     def json_dump(self, obj, depth=1):
         return jsondumps(obj, depth)
-
 
 
 def main():
